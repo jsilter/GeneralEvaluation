@@ -5,6 +5,7 @@ Run set of evaluations on collected data validation.
 We expect a datasheet of patient and exam information.
 """
 
+import datetime
 import argparse
 import os
 
@@ -15,7 +16,9 @@ import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
 
 import general_eval_lib as gel
+import src.utils as utils
 from src.general_eval_lib import plot_roc_prc
+
 
 
 def _get_parser():
@@ -38,26 +41,67 @@ def _get_parser():
 
     return parser
 
-if __name__ == "__main__":
-    input_path = "/Users/silterra/chem_home/Sybil/nlst_predictions/sybil_ensemble_calibrated_v2.csv"
+def _to_dt(instr):
+    if instr is None or pd.isna(instr):
+        return instr
+
+    return utils.parse_date(instr)
+
+def _subtract_dates(a, b):
+    year_diff = a.year - b.year
+    month_diff = a.month - b.month
+    total_diff = 12*year_diff + month_diff
+    return total_diff
+
+def generate_true_columns(input_df, exam_date_col, diagnosis_date_col, true_prefix="true", num_years=5):
+    # Test date parsing and transformations
+    # input_path = "/Users/silterra/Projects/Mirai_general/Apollo/3081_Validation_score.xlsx"
+    # input_name = os.path.basename(input_path)
+    # input_df = gel.load_input_df(input_name, input_path)
+
+    # exam_date_col = "Mammogram_done_date"
+    # diagnosis_date_col = "Biopsy_positive_date"
+    # input_df = input_df[input_df[exam_date_col].notnull() & input_df[diagnosis_date_col].notnull()]
+    # input_df[exam_date_col] = input_df[exam_date_col].apply(_to_dt)
+    # input_df[diagnosis_date_col] = input_df[diagnosis_date_col].apply(_to_dt)
+
+    input_df["__interval_months"] = input_df.apply(lambda x: _subtract_dates(x[diagnosis_date_col], x[exam_date_col]), axis=1)
+    input_df["__interval_years"] = input_df["__interval_months"] // 12
+
+    # true_prefix = "true"
+    # num_years = 6
+    for _year in range(0, num_years):
+        input_df[f"{true_prefix}_year{_year+1}"] = (input_df["__interval_years"] <= _year).astype(int)
+
+    # TODO Include follow dates and set to -1 if patient no longer available
+
+    return input_df
+
+
+
+if True and __name__ == "__main__":
+    # input_path = "/Users/silterra/chem_home/Sybil/nlst_predictions/sybil_ensemble_calibrated_v2.csv"
+    input_path = "/Users/silterra/Projects/Mirai_general/Apollo/3081_Validation_score.xlsx"
+    output_path = os.path.join(os.path.dirname(input_path), "evaluation_report.pdf")
     split_col = "Year"
     input_name = os.path.basename(input_path)
     input_df = gel.load_input_df(input_name, input_path)
 
     print(f"Loaded {len(input_df)} rows from {input_path}")
 
-    output_path = "nlst_gen_eval_debug.pdf"
+    # Read dates for mammogram and biopsy, turn into binary columns for each year
+    generate_true_columns(input_df, "Mammogram_done_date", "Biopsy_positive_date",
+                          num_years=5)
+
     pdf_pages = PdfPages(output_path)
 
-    # TODO Convert to per-year, ie mask properly
     cat_name = "Year"
     categories = [
-        {"name": "Year 1", "pred_col": "Year1", "true_col": "golds"},
-        {"name": "Year 2", "pred_col": "Year2", "true_col": "golds"},
-        {"name": "Year 3", "pred_col": "Year3", "true_col": "golds"},
-        {"name": "Year 4", "pred_col": "Year4", "true_col": "golds"},
-        {"name": "Year 5", "pred_col": "Year5", "true_col": "golds"},
-        {"name": "Year 6", "pred_col": "Year6", "true_col": "golds"}
+        {"name": "Year 1", "pred_col": "year_1", "true_col": "true_year1"},
+        {"name": "Year 2", "pred_col": "year_2", "true_col": "true_year2"},
+        {"name": "Year 3", "pred_col": "year_3", "true_col": "true_year3"},
+        {"name": "Year 4", "pred_col": "year_4", "true_col": "true_year4"},
+        {"name": "Year 5", "pred_col": "year_5", "true_col": "true_year5"},
     ]
 
     curves_by_cat = {}
@@ -69,6 +113,10 @@ if __name__ == "__main__":
         pred_col = cat["pred_col"]
         curves_by_cat[name], stats_by_cat[name] = gel.calculate_roc(input_df, true_col, pred_col)
         all_cat_names.append(name)
+
+        num_true = input_df[true_col].sum()
+        num_total = len(input_df[true_col] >= 0)
+        print(f"{name}: {num_true} / {num_total} = {num_true / num_total:.2%}")
 
     sns.set_theme(style="darkgrid")
     # Preconfigured values: {paper, notebook, talk, poster}
@@ -127,7 +175,9 @@ if __name__ == "__main__":
         fig, ax = plt.subplots(figsize=(24, 3))
         # ax.axis('tight')
         ax.axis('off')
-        ax.set_position([0, 0, 1, 1])
+        side_margin = 0.01
+        top_margin = 0.1
+        ax.set_position([side_margin, 0.01, 1.-2*side_margin, 1.-top_margin])
 
         df = summary_metrics_by_cat_standard.query(f"standard == '{standard['name']}'")
         df = df.round(4)
@@ -152,8 +202,8 @@ if __name__ == "__main__":
         # Format table for readability
         main_fontsize = 14
         # Leave some margins
-        row_height = 0.95/(1.0 + df.shape[0])
-        col_width = 0.95/df.shape[1]
+        row_height = 1.0/(1.0 + df.shape[0])
+        col_width = 1.0/df.shape[1]
         table.auto_set_font_size(False)
         table.set_fontsize(main_fontsize)
         for key, cell in table.get_celld().items():
@@ -164,7 +214,7 @@ if __name__ == "__main__":
 
         ax.add_table(table)
 
-        plt.title(f"Best Thresholds by {standard['name']}")
+        fig.suptitle(f"Best Thresholds by {standard['name']}", fontsize=main_fontsize, fontweight='bold')
         pdf_pages.savefig(fig)
         # plt.show()
 
