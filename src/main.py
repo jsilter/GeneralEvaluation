@@ -48,30 +48,24 @@ def _to_dt(instr):
     return utils.parse_date(instr)
 
 def _subtract_dates(a, b):
+    if str(a) == "-1":
+        return -1
+    if isinstance(a, str):
+        a = _to_dt(a)
+    if isinstance(b, str):
+        b = _to_dt(b)
     year_diff = a.year - b.year
     month_diff = a.month - b.month
     total_diff = 12*year_diff + month_diff
     return total_diff
 
 def generate_true_columns(input_df, exam_date_col, diagnosis_date_col, true_prefix="true", num_years=5):
-    # Test date parsing and transformations
-    # input_path = "/Users/silterra/Projects/Mirai_general/Apollo/3081_Validation_score.xlsx"
-    # input_name = os.path.basename(input_path)
-    # input_df = gel.load_input_df(input_name, input_path)
-
-    # exam_date_col = "Mammogram_done_date"
-    # diagnosis_date_col = "Biopsy_positive_date"
-    # input_df = input_df[input_df[exam_date_col].notnull() & input_df[diagnosis_date_col].notnull()]
-    # input_df[exam_date_col] = input_df[exam_date_col].apply(_to_dt)
-    # input_df[diagnosis_date_col] = input_df[diagnosis_date_col].apply(_to_dt)
 
     input_df["__interval_months"] = input_df.apply(lambda x: _subtract_dates(x[diagnosis_date_col], x[exam_date_col]), axis=1)
     input_df["__interval_years"] = input_df["__interval_months"] // 12
 
-    # true_prefix = "true"
-    # num_years = 6
     for _year in range(0, num_years):
-        input_df[f"{true_prefix}_year{_year+1}"] = (input_df["__interval_years"] <= _year).astype(int)
+        input_df[f"{true_prefix}_year{_year+1}"] = ((0 <= input_df["__interval_years"]) & (input_df["__interval_years"] <= _year)).astype(int)
 
     # TODO Include follow dates and set to -1 if patient no longer available
 
@@ -81,28 +75,31 @@ def generate_true_columns(input_df, exam_date_col, diagnosis_date_col, true_pref
 
 if True and __name__ == "__main__":
     # input_path = "/Users/silterra/chem_home/Sybil/nlst_predictions/sybil_ensemble_calibrated_v2.csv"
-    input_path = "/Users/silterra/Projects/Mirai_general/Apollo/3081_Validation_score.xlsx"
-    output_path = os.path.join(os.path.dirname(input_path), "evaluation_report.pdf")
+    # input_path = "/Users/silterra/Projects/Mirai_general/Apollo/3081_Validation_score.xlsx"
+    input_path = "/Users/silterra/Projects/Mirai_general/2024_ShefaOrman/Copy of final 602 patient Mirai sheet.xlsx"
     split_col = "Year"
+    exam_date_col = "exam date"
+    diagnosis_date_col = "Cancer Diagnosis Date (yyyy-mm)"
+    cat_name = "Year"
+    categories = [
+        {"name": "Year 1", "pred_col": "Year 1", "true_col": "true_year1"},
+        {"name": "Year 2", "pred_col": "Year 2", "true_col": "true_year2"},
+        {"name": "Year 3", "pred_col": "Year 3", "true_col": "true_year3"},
+        {"name": "Year 4", "pred_col": "Year 4", "true_col": "true_year4"},
+        {"name": "Year 5", "pred_col": "Year 5", "true_col": "true_year5"},
+    ]
+
+    output_path = os.path.join(os.path.dirname(input_path), "evaluation_report.pdf")
+
     input_name = os.path.basename(input_path)
-    input_df = gel.load_input_df(input_name, input_path)
+    input_df = gel.load_input_df(input_name, input_path, skiprows=1)
 
     print(f"Loaded {len(input_df)} rows from {input_path}")
 
     # Read dates for mammogram and biopsy, turn into binary columns for each year
-    generate_true_columns(input_df, "Mammogram_done_date", "Biopsy_positive_date",
-                          num_years=5)
+    generate_true_columns(input_df, exam_date_col, diagnosis_date_col, num_years=5)
 
     pdf_pages = PdfPages(output_path)
-
-    cat_name = "Year"
-    categories = [
-        {"name": "Year 1", "pred_col": "year_1", "true_col": "true_year1"},
-        {"name": "Year 2", "pred_col": "year_2", "true_col": "true_year2"},
-        {"name": "Year 3", "pred_col": "year_3", "true_col": "true_year3"},
-        {"name": "Year 4", "pred_col": "year_4", "true_col": "true_year4"},
-        {"name": "Year 5", "pred_col": "year_5", "true_col": "true_year5"},
-    ]
 
     curves_by_cat = {}
     stats_by_cat = {}

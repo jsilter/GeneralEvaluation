@@ -4,7 +4,7 @@ import datetime
 # import dateutil
 
 def parse_date(date_str):
-    formats = ["%Y-%m-%d", "%Y/%m/%d", "%m/%d/%y", "%m/%d/%Y"]
+    formats = ["%Y-%m-%d", "%Y-%m", "%Y/%m/%d", "%m/%d/%y", "%m/%d/%Y"]
     for fmt in formats:
         try:
             return datetime.datetime.strptime(date_str, fmt)

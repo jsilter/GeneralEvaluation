@@ -1,5 +1,6 @@
 import io
 import warnings
+
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
 import numpy as np
@@ -11,13 +12,13 @@ import seaborn as sns
 
 from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score, confusion_matrix
 
-def load_input_df(name, content):
+def load_input_df(name, content, **kwargs):
     if name.endswith(".csv"):
-        input_df = pd.read_csv(content, sep=",")
+        input_df = pd.read_csv(content, sep=",", **kwargs)
     elif name.endswith(".tsv"):
-        input_df = pd.read_csv(content, sep="\t")
+        input_df = pd.read_csv(content, sep="\t", **kwargs)
     elif name.endswith("xlsx"):
-        input_df = pd.read_excel(content)
+        input_df = pd.read_excel(content, **kwargs)
     else:
         raise ValueError(f"Unknown extension in file {name}")
 
