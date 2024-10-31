@@ -44,6 +44,8 @@ def _get_parser():
 def _to_dt(instr):
     if instr is None or pd.isna(instr):
         return instr
+    elif isinstance(instr, (datetime.datetime, pd.Timestamp)):
+        return instr
 
     return utils.parse_date(instr)
 
@@ -95,6 +97,22 @@ if True and __name__ == "__main__":
     input_df = gel.load_input_df(input_name, input_path, skiprows=1)
 
     print(f"Loaded {len(input_df)} rows from {input_path}")
+
+    # Exclude rows where the diagnosis date is before the exam date
+    def _keep_row(row):
+        # Keep the negatives
+        if str(row[diagnosis_date_col]) == "-1":
+            return True
+
+        # Exclude cases where the exam is after the diagnosis
+        date_diff = _subtract_dates(row[diagnosis_date_col], row[exam_date_col])
+        # Require diagnosis be at least 3 months after exam
+        min_months = 3
+        return date_diff >= min_months
+
+    keep_rows = input_df.apply(_keep_row, axis=1)
+    print(f"Keeping {keep_rows.sum()} / {len(keep_rows)} rows with valid exam/diagnosis dates")
+    input_df = input_df.loc[keep_rows, :]
 
     # Read dates for mammogram and biopsy, turn into binary columns for each year
     generate_true_columns(input_df, exam_date_col, diagnosis_date_col, num_years=5)
