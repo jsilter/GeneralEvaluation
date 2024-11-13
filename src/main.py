@@ -92,7 +92,7 @@ def create_basic_stats_table(input_df):
 
         key = f"{start_str} to {end_str}"
 
-        keep_rows = input_df["__interval_months"].between(start, end, inclusive="right")
+        keep_rows = input_df["__interval_months"].between(start, end, inclusive="left")
         basic_stats[key] = int(keep_rows.sum())
 
     # pprint.pprint(basic_stats)
@@ -123,23 +123,22 @@ def create_basic_stats_table(input_df):
     return fig, basic_stats_df
 
 
-
-
 if True and __name__ == "__main__":
     # input_path = "/Users/silterra/chem_home/Sybil/nlst_predictions/sybil_ensemble_calibrated_v2.csv"
-    input_path = "/Users/silterra/Projects/Mirai_general/Apollo/3081_Validation_score.xlsx"
-    diagnosis_date_col = "Biopsy_positive_date"
-    exam_date_col = "Mammogram_done_date"
-    skiprows = 0
-    # input_path = "/Users/silterra/Projects/Mirai_general/2024_ShefaOrman/Copy of final 602 patient Mirai sheet.xlsx"
-    # exam_date_col = "exam date"
-    # diagnosis_date_col = "Cancer Diagnosis Date (yyyy-mm)"
-    # skiprows = 1
+    # input_path = "/Users/silterra/Projects/Mirai_general/Apollo/3081_Validation_score.xlsx"
+    # diagnosis_date_col = "Biopsy_positive_date"
+    # exam_date_col = "Mammogram_done_date"
+    # iprows = 0
+    org_name = "Shefa Orman"
+    input_path = "/Users/silterra/Projects/Mirai_general/2024_ShefaOrman/Copy of final 602 patient Mirai sheet.xlsx"
+    exam_date_col = "exam date"
+    diagnosis_date_col = "Cancer Diagnosis Date (yyyy-mm)"
+    skiprows = 1
     split_col = "Year"
     cat_name = "Year"
     # Require diagnosis be at least 3 months after exam
-    # min_months = 3
     min_months = 3
+    """
     categories = [
         {"name": "Year 1", "pred_col": "year_1", "true_col": "true_year1"},
         {"name": "Year 2", "pred_col": "year_2", "true_col": "true_year2"},
@@ -147,8 +146,16 @@ if True and __name__ == "__main__":
         {"name": "Year 4", "pred_col": "year_4", "true_col": "true_year4"},
         {"name": "Year 5", "pred_col": "year_5", "true_col": "true_year5"},
     ]
+    """
+    categories = [
+        {"name": "Year 1", "pred_col": "Year 1", "true_col": "true_year1"},
+        {"name": "Year 2", "pred_col": "Year 2", "true_col": "true_year2"},
+        {"name": "Year 3", "pred_col": "Year 3", "true_col": "true_year3"},
+        {"name": "Year 4", "pred_col": "Year 4", "true_col": "true_year4"},
+        {"name": "Year 5", "pred_col": "Year 5", "true_col": "true_year5"},
+    ]
 
-    output_path = os.path.join(os.path.dirname(input_path), "evaluation_report.pdf")
+    output_path = os.path.join(os.path.dirname(input_path), f"{org_name} evaluation report.pdf")
 
     input_name = os.path.basename(input_path)
     input_df = gel.load_input_df(input_name, input_path, skiprows=skiprows)
@@ -207,7 +214,7 @@ if True and __name__ == "__main__":
     # ROC Curves
     plot_roc_curves = True
     if plot_roc_curves:
-        fig, ax = plot_roc_prc(curves_by_cat, stats_by_cat, "Apollo Validation")
+        fig, ax = plot_roc_prc(curves_by_cat, stats_by_cat, f"{org_name} Validation")
         pdf_pages.savefig(fig)
         plt.close(fig)
 
