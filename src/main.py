@@ -118,20 +118,24 @@ def create_basic_stats_table(input_df, diagnosis_days_col):
     basic_stats_df["Count"] = basic_stats_df["Count"].astype(int)
     basic_stats_df = basic_stats_df.reset_index()
     # Create a figure and axis
-    fig, ax = plt.subplots(figsize=(8, 2))  # Adjust the size as needed
+    fig, ax = plt.subplots(figsize=(8, 3))  # Adjust the size as needed
     # Create the table
     table = plt.table(cellText=basic_stats_df.values,
                       colLabels=basic_stats_df.columns,
                       cellLoc='center', loc='center')
     df = basic_stats_df
     col_width = 1.0 / df.shape[1]
-    table.auto_set_font_size(False)
+    col_height = 0.1
+    # table.auto_set_font_size(False)
     for key, cell in table.get_celld().items():
         if key[0] == 0:
             cell.set_text_props(fontweight='bold')
         cell.set_width(col_width)
+        cell.set_height(col_height)
 
     ax.add_table(table)
+    plt.title("Counts of Positive Diagnoses by Time Interval", pad=16, fontweight='bold')
+    plt.subplots_adjust(top=0.80)
     ax.axis('tight')
     ax.axis('off')
 
@@ -214,15 +218,12 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
         pdf_pages.savefig(fig)
         # plt.show()
 
-def main():
-    ds_name = "NLST"
-    input_path = "/Users/silterra/chem_home/Sybil/nlst_predictions/sybil_ensemble_calibrated_v2.csv"
-    split_col = "Year"
-
+def run_full_eval(ds_name, input_path, split_col="Year", ppv_target=0.85):
     # Column names
     diagnosis_days_col = "candx_days"
     # followup_days_col = "fup_days"
     num_years = 6
+    required_columns = [diagnosis_days_col]
 
     # Require diagnosis be at least 3 months after exam
     min_months = 3
@@ -236,7 +237,6 @@ def main():
         {"name": "Year 6", "pred_col": "Year6", "true_col": "true_year6"},
     ]
 
-    ppv_target = 0.85
     standards = [
         {"name": f"PPV (target)", "metric": "PPV", "direction": "min_diff", "target_value": ppv_target},
         {"name": "F1", "metric": "f1_score", "direction": "max"},
@@ -248,8 +248,14 @@ def main():
     input_name = os.path.basename(input_path)
     input_df = gel.load_input_df(input_name, input_path, comment="#")
 
-    print(f"Loaded {len(input_df)} rows from {input_path}")
-    # print(f"Columns: {input_df.columns}")
+    keep_categories = [cat for cat in categories if cat["pred_col"] in input_df.columns]
+    if len(keep_categories) == 0:
+        category_names = [cat["pred_col"] for cat in categories]
+        raise ValueError(f"Input file does not contain any of the expected categories: {category_names}")
+
+    for rc in required_columns:
+        if rc not in input_df.columns:
+            raise ValueError(f"Input file does not contain required column: {rc}")
 
     # Keep rows where the diagnosis is at least min_months after the exam
     def _keep_row(row, min_days=min_days):
@@ -263,17 +269,12 @@ def main():
     # Read days until diagnosis, generate binary columns for each year
     generate_true_columns(input_df, diagnosis_days_col, num_years=num_years)
 
-    fig, basic_stats_df = create_basic_stats_table(input_df, diagnosis_days_col)
-
-    pdf_pages = PdfPages(output_path)
-    pdf_pages.savefig(fig)
-    plt.close(fig)
-
     if min_months is not None:
         keep_rows = input_df.apply(_keep_row, axis=1)
         print(f"Keeping {keep_rows.sum()} / {len(keep_rows)} rows with valid exam/diagnosis dates")
         input_df = input_df.loc[keep_rows, :]
 
+    # Calculate ROC curves and binary metrics, separated by category (ie year)
     curves_by_cat = {}
     stats_by_cat = {}
     all_cat_names = []
@@ -288,11 +289,25 @@ def main():
         num_total = len(input_df[true_col] >= 0)
         print(f"{name}: {num_true} / {num_total} = {num_true / num_total:.2%}")
 
+    all_metrics_df = gel.calc_all_metrics(curves_by_cat, split_col=split_col)
+
+    # ------------ Plotting ------------ #
     sns.set_theme(style="darkgrid")
     # Preconfigured values: {paper, notebook, talk, poster}
     sns.set_context("notebook", font_scale=1.0)
 
-    # ROC Curves
+    fig, basic_stats_df = create_basic_stats_table(input_df, diagnosis_days_col)
+    # plt.tight_layout()
+
+    pdf_pages = PdfPages(output_path)
+    pdf_pages.savefig(fig)
+    plt.close(fig)
+
+    # Tables of thresholds for particular targets
+    summary_metrics_by_cat_standard = generate_standards_df(all_metrics_df, standards, categories, split_col)
+    plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split_col)
+
+    # Plot ROC Curves
     plot_roc_curves = True
     if plot_roc_curves:
         fig, ax = plot_roc_prc(curves_by_cat, stats_by_cat, f"{ds_name} Validation")
@@ -300,7 +315,6 @@ def main():
         plt.close(fig)
 
     # Plot binary metrics by threshold
-    all_metrics_df = gel.calc_all_metrics(curves_by_cat, split_col=split_col)
     for cat in categories:
         split_name = cat["name"]
         true_col = cat["true_col"]
@@ -323,11 +337,17 @@ def main():
         pdf_pages.savefig(fig)
         plt.close(fig)
 
-    summary_metrics_by_cat_standard  = generate_standards_df(all_metrics_df, standards, categories, split_col)
-    plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split_col)
 
     pdf_pages.close()
 
-if True and __name__ == "__main__":
-    main()
+    print(f"Saved evaluation report to {output_path}")
+    return output_path
 
+def _run_main_nlst():
+    ds_name = "NLST"
+    input_path = "/Users/silterra/chem_home/Sybil/nlst_predictions/sybil_ensemble_calibrated_v2.csv"
+
+    run_full_eval(ds_name, input_path, split_col="Year")
+
+if True and __name__ == "__main__":
+    _run_main_nlst()
