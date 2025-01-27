@@ -23,7 +23,6 @@ import src.utils as utils
 from src.general_eval_lib import plot_roc_prc
 
 
-
 def _get_parser():
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -52,7 +51,7 @@ def _to_dt(instr):
 
     return utils.parse_date(instr)
 
-def _subtract_dates(a, b):
+def ___subtract_dates(a, b):
     if str(a) == "-1":
         return -1
     if isinstance(a, str):
@@ -64,22 +63,39 @@ def _subtract_dates(a, b):
     total_diff = 12*year_diff + month_diff
     return total_diff
 
-def generate_true_columns(input_df, exam_date_col, diagnosis_date_col, true_prefix="true", num_years=5):
+def _is_positive_diag(days):
+    return str(days).lower() not in {"-1", "nan", "nat", "", "none"}
 
-    input_df["__interval_months"] = input_df.apply(lambda x: _subtract_dates(x[diagnosis_date_col], x[exam_date_col]), axis=1)
-    input_df["__interval_years"] = input_df["__interval_months"] // 12
+def _is_negative_diag(days):
+    return not _is_positive_diag(days)
+
+def _days_to_months(days):
+    if _is_negative_diag(days):
+        return -1
+    return int(days) / 30
+
+def _days_to_years(days):
+    if _is_negative_diag(days):
+        return -1
+    return int(days) / 365
+
+def generate_true_columns(input_df, diagnosis_days_col, true_prefix="true", num_years=5):
+
+    input_df["__interval_months"] = input_df[diagnosis_days_col].apply(_days_to_months)
+    input_df["__interval_years"] = input_df[diagnosis_days_col].apply(_days_to_years)
 
     for _year in range(0, num_years):
-        input_df[f"{true_prefix}_year{_year+1}"] = ((0 <= input_df["__interval_years"]) & (input_df["__interval_years"] <= _year)).astype(int)
+        _yp1 = _year + 1
+        input_df[f"{true_prefix}_year{_yp1}"] = ((0 <= input_df["__interval_years"]) & (input_df["__interval_years"] < _yp1)).astype(int)
 
     # TODO Include follow dates and set to -1 if patient no longer available
 
     return input_df
 
-def create_basic_stats_table(input_df):
+def create_basic_stats_table(input_df, diagnosis_days_col):
     basic_stats = {"Total": len(input_df),
-                   "Positive": int(input_df.apply(_is_positive, axis=1).sum())}
-    month_intervals = [(-np.inf, 0), (0, 3), (3, 12), (12, 24), (24, 36), (36, 48), (48, 60), (60, np.inf)]
+                   "Positive": int(input_df[diagnosis_days_col].apply(_is_positive_diag).sum())}
+    month_intervals = [(0, 3), (3, 12), (12, 24), (24, 36), (36, 48), (48, 60), (60, 72), (72, np.inf)]
     for start, end in month_intervals:
         if start is None or start == -np.inf:
             start_str = "-Inf"
@@ -98,8 +114,7 @@ def create_basic_stats_table(input_df):
     # pprint.pprint(basic_stats)
     basic_stats_df = pd.DataFrame([basic_stats]).T
     basic_stats_df.columns = ["Count"]
-    fraction = basic_stats_df["Count"] / basic_stats_df.loc["Total", "Count"]
-    # basic_stats_df["Percent"] = (100.0*fraction).round(2)
+    # fraction = basic_stats_df["Count"] / basic_stats_df.loc["Total", "Count"]
     basic_stats_df["Count"] = basic_stats_df["Count"].astype(int)
     basic_stats_df = basic_stats_df.reset_index()
     # Create a figure and axis
@@ -122,128 +137,8 @@ def create_basic_stats_table(input_df):
 
     return fig, basic_stats_df
 
-
-if True and __name__ == "__main__":
-    # input_path = "/Users/silterra/chem_home/Sybil/nlst_predictions/sybil_ensemble_calibrated_v2.csv"
-    # input_path = "/Users/silterra/Projects/Mirai_general/Apollo/3081_Validation_score.xlsx"
-    # diagnosis_date_col = "Biopsy_positive_date"
-    # exam_date_col = "Mammogram_done_date"
-    # iprows = 0
-    org_name = "Shefa Orman"
-    input_path = "/Users/silterra/Projects/Mirai_general/2024_ShefaOrman/Copy of final 602 patient Mirai sheet.xlsx"
-    exam_date_col = "exam date"
-    diagnosis_date_col = "Cancer Diagnosis Date (yyyy-mm)"
-    skiprows = 1
-    split_col = "Year"
-    cat_name = "Year"
-    # Require diagnosis be at least 3 months after exam
-    min_months = 3
-    """
-    categories = [
-        {"name": "Year 1", "pred_col": "year_1", "true_col": "true_year1"},
-        {"name": "Year 2", "pred_col": "year_2", "true_col": "true_year2"},
-        {"name": "Year 3", "pred_col": "year_3", "true_col": "true_year3"},
-        {"name": "Year 4", "pred_col": "year_4", "true_col": "true_year4"},
-        {"name": "Year 5", "pred_col": "year_5", "true_col": "true_year5"},
-    ]
-    """
-    categories = [
-        {"name": "Year 1", "pred_col": "Year 1", "true_col": "true_year1"},
-        {"name": "Year 2", "pred_col": "Year 2", "true_col": "true_year2"},
-        {"name": "Year 3", "pred_col": "Year 3", "true_col": "true_year3"},
-        {"name": "Year 4", "pred_col": "Year 4", "true_col": "true_year4"},
-        {"name": "Year 5", "pred_col": "Year 5", "true_col": "true_year5"},
-    ]
-
-    output_path = os.path.join(os.path.dirname(input_path), f"{org_name} evaluation report.pdf")
-
-    input_name = os.path.basename(input_path)
-    input_df = gel.load_input_df(input_name, input_path, skiprows=skiprows)
-
-    print(f"Loaded {len(input_df)} rows from {input_path}")
-    # print(f"Columns: {input_df.columns}")
-
-    def _is_positive(row):
-        return str(row[diagnosis_date_col]).lower() not in {"-1", "nan", "nat", ""}
-
-    def _is_negative(row):
-        return not _is_positive(row)
-
-    # Exclude rows where the diagnosis date is before the exam date
-    def _keep_row(row, min_months=min_months):
-        # Keep the negatives
-        if _is_negative(row):
-            return True
-
-        # Exclude cases where the exam is after the diagnosis
-        date_diff = _subtract_dates(row[diagnosis_date_col], row[exam_date_col])
-        return date_diff >= min_months
-
-    # Read dates for mammogram and biopsy, turn into binary columns for each year
-    generate_true_columns(input_df, exam_date_col, diagnosis_date_col, num_years=5)
-
-    fig, basic_stats_df = create_basic_stats_table(input_df)
-
-    pdf_pages = PdfPages(output_path)
-    pdf_pages.savefig(fig)
-    plt.close(fig)
-
-    if min_months is not None:
-        keep_rows = input_df.apply(_keep_row, axis=1)
-        print(f"Keeping {keep_rows.sum()} / {len(keep_rows)} rows with valid exam/diagnosis dates")
-        input_df = input_df.loc[keep_rows, :]
-
-    curves_by_cat = {}
-    stats_by_cat = {}
-    all_cat_names = []
-    for cat in categories:
-        name = cat["name"]
-        true_col = cat["true_col"]
-        pred_col = cat["pred_col"]
-        curves_by_cat[name], stats_by_cat[name] = gel.calculate_roc(input_df, true_col, pred_col)
-        all_cat_names.append(name)
-
-        num_true = input_df[true_col].sum()
-        num_total = len(input_df[true_col] >= 0)
-        print(f"{name}: {num_true} / {num_total} = {num_true / num_total:.2%}")
-
-    sns.set_theme(style="darkgrid")
-    # Preconfigured values: {paper, notebook, talk, poster}
-    sns.set_context("notebook", font_scale=1.0)
-
-    # ROC Curves
-    plot_roc_curves = True
-    if plot_roc_curves:
-        fig, ax = plot_roc_prc(curves_by_cat, stats_by_cat, f"{org_name} Validation")
-        pdf_pages.savefig(fig)
-        plt.close(fig)
-
-    # Plot binary metrics by threshold
-    all_metrics_df = gel.calc_all_metrics(curves_by_cat, split_col=split_col)
-    for cat in categories:
-        split_name = cat["name"]
-        true_col = cat["true_col"]
-        pred_col = cat["pred_col"]
-        fig_name = f"{split_name}"
-        metrics_df = all_metrics_df[all_metrics_df[split_col] == split_name]
-        figures = gel.plot_binary_metrics(metrics_df, fig_name)
-
-        for fig in figures:
-            pdf_pages.savefig(fig)
-            plt.close(fig)
-
-        # split_df = input_df[input_df[split_col] == split_name]
-        # Histogram and boxplot of predictions by actual class
-        split_df = input_df
-        fig = gel.plot_histograms(split_df, true_col, pred_col, fig_name)
-        pdf_pages.savefig(fig)
-        plt.close(fig)
-
+def generate_standards_df(all_metrics_df, standards, categories, split_col):
     # Print out table of thresholds and stats
-    standards = [
-        {"name": "F1", "metric": "f1_score", "direction": "max"},
-        {"name": "Balanced Accuracy", "metric": "balanced_accuracy", "direction": "max"},
-    ]
 
     summary_metrics_by_cat_standard = []
     for standard in standards:
@@ -252,14 +147,26 @@ if True and __name__ == "__main__":
             split_name = cat["name"]
             true_col = cat["true_col"]
             pred_col = cat["pred_col"]
-            split_df = all_metrics_df.query(f"{split_col} == '{split_name}'")
-            split_df = split_df.sort_values(standard["metric"], ascending=standard["direction"] == "min")
-            best_row = split_df.iloc[0].copy()
+            split_df = all_metrics_df.query(f"{split_col} == '{split_name}'").copy()
+
+            if standard["direction"] == "min_diff":
+                split_df["diff"] = np.abs(split_df[standard["metric"]] - standard["target_value"])
+                split_df = split_df.sort_values("diff", ascending=True)
+                best_row = split_df.iloc[0].copy()
+            else:
+                split_df = split_df.sort_values(standard["metric"], ascending=standard["direction"] == "min")
+                best_row = split_df.iloc[0].copy()
+
             best_row["standard"] = standard["name"]
             summary_metrics_by_cat_standard.append(best_row)
 
     summary_metrics_by_cat_standard = pd.DataFrame(summary_metrics_by_cat_standard).reset_index(drop=True)
-    for standard in standards:
+    return summary_metrics_by_cat_standard
+
+def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split_col):
+
+    standard_names = summary_metrics_by_cat_standard["standard"].unique()
+    for standard_name in standard_names:
         # Create a figure and axis
         fig, ax = plt.subplots(figsize=(24, 3))
         # ax.axis('tight')
@@ -268,7 +175,7 @@ if True and __name__ == "__main__":
         top_margin = 0.1
         ax.set_position([side_margin, 0.01, 1.-2*side_margin, 1.-top_margin])
 
-        df = summary_metrics_by_cat_standard.query(f"standard == '{standard['name']}'")
+        df = summary_metrics_by_cat_standard.query(f"standard == '{standard_name}'")
         df = df.round(4)
 
         # Re-arrange column order
@@ -303,10 +210,124 @@ if True and __name__ == "__main__":
 
         ax.add_table(table)
 
-        fig.suptitle(f"Best Thresholds by {standard['name']}", fontsize=main_fontsize, fontweight='bold')
+        fig.suptitle(f"Best Thresholds by {standard_name}", fontsize=main_fontsize, fontweight='bold')
         pdf_pages.savefig(fig)
         # plt.show()
 
+def main():
+    ds_name = "NLST"
+    input_path = "/Users/silterra/chem_home/Sybil/nlst_predictions/sybil_ensemble_calibrated_v2.csv"
+    split_col = "Year"
+
+    # Column names
+    diagnosis_days_col = "candx_days"
+    # followup_days_col = "fup_days"
+    num_years = 6
+
+    # Require diagnosis be at least 3 months after exam
+    min_months = 3
+    min_days = int(min_months*30)
+    categories = [
+        {"name": "Year 1", "pred_col": "Year1", "true_col": "true_year1"},
+        {"name": "Year 2", "pred_col": "Year2", "true_col": "true_year2"},
+        {"name": "Year 3", "pred_col": "Year3", "true_col": "true_year3"},
+        {"name": "Year 4", "pred_col": "Year4", "true_col": "true_year4"},
+        {"name": "Year 5", "pred_col": "Year5", "true_col": "true_year5"},
+        {"name": "Year 6", "pred_col": "Year6", "true_col": "true_year6"},
+    ]
+
+    ppv_target = 0.85
+    standards = [
+        {"name": f"PPV (target)", "metric": "PPV", "direction": "min_diff", "target_value": ppv_target},
+        {"name": "F1", "metric": "f1_score", "direction": "max"},
+        {"name": "Balanced Accuracy", "metric": "balanced_accuracy", "direction": "max"},
+    ]
+
+    output_path = os.path.join(os.path.dirname(input_path), f"{ds_name} evaluation report.pdf")
+
+    input_name = os.path.basename(input_path)
+    input_df = gel.load_input_df(input_name, input_path, comment="#")
+
+    print(f"Loaded {len(input_df)} rows from {input_path}")
+    # print(f"Columns: {input_df.columns}")
+
+    # Keep rows where the diagnosis is at least min_months after the exam
+    def _keep_row(row, min_days=min_days):
+        # Keep the negatives
+        if _is_negative_diag(row[diagnosis_days_col]):
+            return True
+
+        # Only include cases where the diagnosis is at least min_days after the exam
+        return int(row[diagnosis_days_col]) > min_days
+
+    # Read days until diagnosis, generate binary columns for each year
+    generate_true_columns(input_df, diagnosis_days_col, num_years=num_years)
+
+    fig, basic_stats_df = create_basic_stats_table(input_df, diagnosis_days_col)
+
+    pdf_pages = PdfPages(output_path)
+    pdf_pages.savefig(fig)
+    plt.close(fig)
+
+    if min_months is not None:
+        keep_rows = input_df.apply(_keep_row, axis=1)
+        print(f"Keeping {keep_rows.sum()} / {len(keep_rows)} rows with valid exam/diagnosis dates")
+        input_df = input_df.loc[keep_rows, :]
+
+    curves_by_cat = {}
+    stats_by_cat = {}
+    all_cat_names = []
+    for cat in categories:
+        name = cat["name"]
+        true_col = cat["true_col"]
+        pred_col = cat["pred_col"]
+        curves_by_cat[name], stats_by_cat[name] = gel.calculate_roc(input_df, true_col, pred_col)
+        all_cat_names.append(name)
+
+        num_true = input_df[true_col].sum()
+        num_total = len(input_df[true_col] >= 0)
+        print(f"{name}: {num_true} / {num_total} = {num_true / num_total:.2%}")
+
+    sns.set_theme(style="darkgrid")
+    # Preconfigured values: {paper, notebook, talk, poster}
+    sns.set_context("notebook", font_scale=1.0)
+
+    # ROC Curves
+    plot_roc_curves = True
+    if plot_roc_curves:
+        fig, ax = plot_roc_prc(curves_by_cat, stats_by_cat, f"{ds_name} Validation")
+        pdf_pages.savefig(fig)
+        plt.close(fig)
+
+    # Plot binary metrics by threshold
+    all_metrics_df = gel.calc_all_metrics(curves_by_cat, split_col=split_col)
+    for cat in categories:
+        split_name = cat["name"]
+        true_col = cat["true_col"]
+        pred_col = cat["pred_col"]
+        fig_name = f"{split_name}"
+
+        metrics_df = all_metrics_df
+        if split_col is not None:
+            metrics_df = all_metrics_df[all_metrics_df[split_col] == split_name]
+
+        figures = gel.plot_binary_metrics(metrics_df, fig_name)
+
+        for fig in figures:
+            pdf_pages.savefig(fig)
+            plt.close(fig)
+
+        # Histogram and boxplot of predictions by actual class
+        split_df = input_df
+        fig = gel.plot_histograms(split_df, true_col, pred_col, fig_name)
+        pdf_pages.savefig(fig)
+        plt.close(fig)
+
+    summary_metrics_by_cat_standard  = generate_standards_df(all_metrics_df, standards, categories, split_col)
+    plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split_col)
+
     pdf_pages.close()
 
+if True and __name__ == "__main__":
+    main()
 
