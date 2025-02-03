@@ -17,24 +17,26 @@ def displayPDF(file_path, name="results"):
     with open(file_path, "rb") as f:
         base64_pdf = base64.b64encode(f.read()).decode('utf-8')
 
+    width = 1200
     height = 800
 
     # Embedding PDF in HTML
-    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" name="{name}" width="1200" height="{height}" type="application/pdf"></iframe>'
+    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" name="{name}" width="{width}" height="{height}" type="application/pdf"></iframe>'
 
     # Displaying File
     st.markdown(pdf_display, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     st.title("Model Performance Evaluation")
-    st.write("This is a simple web app to evaluate the performance of a model. Make sure your data is formatted properly before uploading.")
+    st.markdown("""This is a simple web app to evaluate the performance of a classification model.   
+             Make sure your data is formatted properly before uploading (see below).""")
 
     ds_name = st.text_input("Dataset Name", value="My Dataset")
 
     uploaded_file = st.file_uploader("Results table", type=["csv", "tsv", "xls", "xlsx"])
     st.markdown(f"""Upload a file containing the results of the model. The file should contain the following columns:   
                 - `{DIAGNOSIS_DAYS_COL}`: Days between exam and cancer diagnosis. '-1' indicates no cancer diagnosis.  
-                - `{FOLLOWUP_DAYS_COL}`: Days between exam and last follow-up.   
+                - `{FOLLOWUP_DAYS_COL}`: Days between exam and latest follow-up.   
                 - `Year1`: Model prediction for year 1.  
                 - `Year2`: Model prediction for year 2.  
                 - `Year3`: Model prediction for year 3.  
@@ -68,20 +70,31 @@ if __name__ == "__main__":
             temp_file.write(uploaded_file.getvalue())
             temp_file_path = temp_file.name
 
-        output_file = run_full_eval(ds_name, temp_file_path, recall_target=recall_target)
+        pdf_output_file, all_metrics_df = run_full_eval(ds_name, temp_file_path, recall_target=recall_target)
         st.write("Evaluation complete!")
-        output_file_name = output_file.split("/")[-1]
 
-        with open(output_file, "rb") as file:
+        # Download button for overall metrics table
+        metrics_file_name = f"{ds_name.strip()} metrics.csv"
+        metrics_csv = all_metrics_df.to_csv(index=False).encode()
+        st.download_button(
+            label="Download Metrics",
+            data=metrics_csv,
+            file_name=metrics_file_name,
+            mime="text/csv"
+        )
+
+        pdf_report_file_name = pdf_output_file.split("/")[-1]
+
+        with open(pdf_output_file, "rb") as file:
             st.download_button(
                 label="Download PDF",
                 data=file,
-                file_name=output_file_name,
+                file_name=pdf_report_file_name,
                 mime="application/pdf"
             )
 
-        displayPDF(output_file)
+        displayPDF(pdf_output_file)
 
         # Clean up temporary files
         os.remove(temp_file_path)
-        os.remove(output_file)
+        os.remove(pdf_output_file)

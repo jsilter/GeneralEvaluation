@@ -270,7 +270,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85):
     ]
 
     standards = [
-        {"name": f"Recall (target)", "metric": "recall", "direction": "min_diff", "target_value": recall_target},
+        {"name": f"Recall", "metric": "recall", "direction": "min_diff", "target_value": recall_target},
         {"name": "F1", "metric": "f1_score", "direction": "max"},
         {"name": "Balanced Accuracy", "metric": "balanced_accuracy", "direction": "max"},
     ]
@@ -280,6 +280,8 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85):
     input_name = os.path.basename(input_path)
     input_df = gel.load_input_df(input_name, input_path, comment="#")
     input_df = input_df.dropna(subset=[followup_days_col])
+    # Remove spaces from column names
+    input_df.columns = input_df.columns.str.replace(" ", "")
 
     keep_categories = [cat for cat in categories if cat["pred_col"] in input_df.columns]
     if len(keep_categories) == 0:
@@ -308,7 +310,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85):
 
     if min_months is not None:
         keep_rows = input_df.apply(_keep_row, axis=1)
-        print(f"Keeping {keep_rows.sum()} / {len(keep_rows)} rows with valid exam/diagnosis dates")
+        # print(f"Keeping {keep_rows.sum()} / {len(keep_rows)} rows with valid exam/diagnosis dates")
         input_df = input_df.loc[keep_rows, :]
 
     # Calculate ROC curves and binary metrics, separated by category (ie year)
@@ -326,7 +328,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85):
 
         num_true = cur_df[true_col].sum()
         num_total = len(cur_df[true_col] >= 0)
-        print(f"{name}: {num_true} / {num_total} = {num_true / num_total:.2%}")
+        # print(f"{name}: {num_true} / {num_total} = {num_true / num_total:.2%}")
 
     all_metrics_df = gel.calc_all_metrics(curves_by_cat, split_col=split_col)
 
@@ -380,7 +382,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85):
     pdf_pages.close()
 
     print(f"Saved evaluation report to {output_path}")
-    return output_path
+    return output_path, all_metrics_df
 
 def _run_main_nlst():
     ds_name = "NLST"
