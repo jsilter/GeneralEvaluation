@@ -7,13 +7,10 @@ We expect a datasheet of patient and exam information.
 
 import argparse
 import datetime
-import math
 import os
-import pprint
 
 import numpy as np
 import pandas as pd
-import matplotlib
 from matplotlib import pyplot as plt
 import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
@@ -21,6 +18,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 import general_eval_lib as gel
 import src.utils as utils
 from src.general_eval_lib import plot_roc_prc
+
+DAYS_PER_YEAR = 365.25
 
 
 def _get_parser():
@@ -51,20 +50,16 @@ def _to_dt(instr):
 
     return utils.parse_date(instr)
 
-def ___subtract_dates(a, b):
-    if str(a) == "-1":
-        return -1
-    if isinstance(a, str):
-        a = _to_dt(a)
-    if isinstance(b, str):
-        b = _to_dt(b)
-    year_diff = a.year - b.year
-    month_diff = a.month - b.month
-    total_diff = 12*year_diff + month_diff
-    return total_diff
-
 def _is_positive_diag(days):
-    return str(days).lower() not in {"-1", "nan", "nat", "", "none"}
+    if days is None:
+        return False
+    elif str(days).lower() in {"-1", "-1.0", "nan", "nat", "", "none"}:
+        return False
+    else:
+        try:
+            return float(days) >= 0
+        except ValueError:
+            return False
 
 def _is_negative_diag(days):
     return not _is_positive_diag(days)
@@ -77,18 +72,52 @@ def _days_to_months(days):
 def _days_to_years(days):
     if _is_negative_diag(days):
         return -1
-    return int(days) / 365
+    return int(days) / DAYS_PER_YEAR
 
-def generate_true_columns(input_df, diagnosis_days_col, true_prefix="true", num_years=5):
+def _gen_year_vec(row, diagnosis_days_col, followup_days_col, max_followup=5):
+    """
+    Generate a binary vector indicating whether the patient has been diagnosed with cancer within the given year.
+    :param row:
+    :param diagnosis_days_col:
+    :param followup_days_col:
+    :param max_followup:
+    :return:
+        y_seq - Indicator vector of whether the patient has been diagnosed with cancer within the given year.
+            -1 indicates that the patient is not available for followup at that time.
+            0 indicates that the patient has not been diagnosed with cancer at that time.
+            1 indicates that the patient has been diagnosed with cancer at that time.
+        y_mask - Indicator vector of whether the patient is available for followup at that time.
+    """
+    days_to_last_followup = int(row[followup_days_col])
+    years_to_last_followup = int(days_to_last_followup // DAYS_PER_YEAR)
+
+    days_to_cancer = int(row[diagnosis_days_col])
+    years_to_cancer = int(days_to_cancer // DAYS_PER_YEAR) if days_to_cancer > -1 else 100
+
+    y = years_to_cancer < max_followup
+    y_seq = np.zeros(max_followup)
+    if y:
+        # time_at_event = years_to_cancer
+        y_seq[years_to_cancer:] = 1
+        y_mask = np.ones(max_followup)
+    else:
+        time_at_event = min(years_to_last_followup, max_followup - 1)
+        y_mask = np.array([1] * (time_at_event + 1) + [0] * (max_followup - (time_at_event + 1)))
+
+    for ii, yv in enumerate(y_seq):
+        y_seq[ii] = y_seq[ii] if y_mask[ii] else -1
+
+    return y_seq, y_mask
+
+
+def generate_true_columns(input_df, diagnosis_days_col, followup_days_col, true_prefix="true", num_years=5):
 
     input_df["__interval_months"] = input_df[diagnosis_days_col].apply(_days_to_months)
-    input_df["__interval_years"] = input_df[diagnosis_days_col].apply(_days_to_years)
 
-    for _year in range(0, num_years):
-        _yp1 = _year + 1
-        input_df[f"{true_prefix}_year{_yp1}"] = ((0 <= input_df["__interval_years"]) & (input_df["__interval_years"] < _yp1)).astype(int)
-
-    # TODO Include follow dates and set to -1 if patient no longer available
+    year_cols = [f"{true_prefix}_year{y}" for y in range(1, num_years+1)]
+    for rn, row in input_df.iterrows():
+        y_seq, y_mask = _gen_year_vec(row, diagnosis_days_col, followup_days_col, max_followup=num_years)
+        input_df.loc[rn, year_cols] = y_seq
 
     return input_df
 
@@ -134,7 +163,7 @@ def create_basic_stats_table(input_df, diagnosis_days_col):
         cell.set_height(col_height)
 
     ax.add_table(table)
-    plt.title("Counts of Positive Diagnoses by Time Interval", pad=16, fontweight='bold')
+    plt.title("Patient Counts by Time Interval", pad=16, fontweight='bold')
     plt.subplots_adjust(top=0.80)
     ax.axis('tight')
     ax.axis('off')
@@ -185,11 +214,11 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
         # Re-arrange column order
         custom_column_order = [
             "standard", split_col, "threshold", "f1_score", "balanced_accuracy",
-            "PPV", "NPV", "LR+", "N", "TP", "FP", "TN", "FN"
+            "PPV", "NPV", "recall", "LR+", "N", "TP", "FP", "TN", "FN"
         ]
         df = df[custom_column_order]
         custom_column_labels = list(df.columns)
-        cust_mapping = [("f1_score", "F1"), ("balanced_accuracy", "Balanced Acc.")]
+        cust_mapping = [("f1_score", "F1"), ("balanced_accuracy", "Balanced Acc."), ("recall", "Recall")]
         for old, new in cust_mapping:
             custom_column_labels[custom_column_labels.index(old)] = new
 
@@ -218,12 +247,12 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
         pdf_pages.savefig(fig)
         # plt.show()
 
-def run_full_eval(ds_name, input_path, split_col="Year", ppv_target=0.85):
+def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85):
     # Column names
     diagnosis_days_col = "candx_days"
-    # followup_days_col = "fup_days"
-    num_years = 6
-    required_columns = [diagnosis_days_col]
+    followup_days_col = "fup_days"
+    # num_years = None
+    required_columns = [diagnosis_days_col, followup_days_col]
 
     # Require diagnosis be at least 3 months after exam
     min_months = 3
@@ -238,7 +267,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", ppv_target=0.85):
     ]
 
     standards = [
-        {"name": f"PPV (target)", "metric": "PPV", "direction": "min_diff", "target_value": ppv_target},
+        {"name": f"Recall (target)", "metric": "recall", "direction": "min_diff", "target_value": recall_target},
         {"name": "F1", "metric": "f1_score", "direction": "max"},
         {"name": "Balanced Accuracy", "metric": "balanced_accuracy", "direction": "max"},
     ]
@@ -247,11 +276,16 @@ def run_full_eval(ds_name, input_path, split_col="Year", ppv_target=0.85):
 
     input_name = os.path.basename(input_path)
     input_df = gel.load_input_df(input_name, input_path, comment="#")
+    input_df = input_df.dropna(subset=[followup_days_col])
 
     keep_categories = [cat for cat in categories if cat["pred_col"] in input_df.columns]
     if len(keep_categories) == 0:
         category_names = [cat["pred_col"] for cat in categories]
         raise ValueError(f"Input file does not contain any of the expected categories: {category_names}")
+    num_years = len(keep_categories)
+
+    numeric_cols = [diagnosis_days_col, followup_days_col] + [cat["pred_col"] for cat in keep_categories]
+    input_df[numeric_cols] = input_df[numeric_cols].apply(pd.to_numeric, errors='coerce')
 
     for rc in required_columns:
         if rc not in input_df.columns:
@@ -267,7 +301,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", ppv_target=0.85):
         return int(row[diagnosis_days_col]) > min_days
 
     # Read days until diagnosis, generate binary columns for each year
-    generate_true_columns(input_df, diagnosis_days_col, num_years=num_years)
+    generate_true_columns(input_df, diagnosis_days_col, followup_days_col, num_years=num_years)
 
     if min_months is not None:
         keep_rows = input_df.apply(_keep_row, axis=1)
@@ -282,11 +316,13 @@ def run_full_eval(ds_name, input_path, split_col="Year", ppv_target=0.85):
         name = cat["name"]
         true_col = cat["true_col"]
         pred_col = cat["pred_col"]
-        curves_by_cat[name], stats_by_cat[name] = gel.calculate_roc(input_df, true_col, pred_col)
+        cur_df = input_df.query(f"{true_col} >= 0")
+
+        curves_by_cat[name], stats_by_cat[name] = gel.calculate_roc(cur_df, true_col, pred_col)
         all_cat_names.append(name)
 
-        num_true = input_df[true_col].sum()
-        num_total = len(input_df[true_col] >= 0)
+        num_true = cur_df[true_col].sum()
+        num_total = len(cur_df[true_col] >= 0)
         print(f"{name}: {num_true} / {num_total} = {num_true / num_total:.2%}")
 
     all_metrics_df = gel.calc_all_metrics(curves_by_cat, split_col=split_col)
@@ -345,7 +381,8 @@ def run_full_eval(ds_name, input_path, split_col="Year", ppv_target=0.85):
 
 def _run_main_nlst():
     ds_name = "NLST"
-    input_path = "/Users/silterra/chem_home/Sybil/nlst_predictions/sybil_ensemble_calibrated_v2.csv"
+    # input_path = "/Users/silterra/chem_home/Sybil/nlst_predictions/sybil_ensemble_calibrated_v2.csv"
+    input_path = "/Users/silterra/Projects/GeneralEvaluation/data/sybil_ensemble_for_eval_test.csv"
 
     run_full_eval(ds_name, input_path, split_col="Year")
 
