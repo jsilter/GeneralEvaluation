@@ -10,7 +10,7 @@ import tempfile
 
 import streamlit as st
 
-from main import run_full_eval
+from main import run_full_eval, DIAGNOSIS_DAYS_COL, FOLLOWUP_DAYS_COL
 
 def displayPDF(file_path, name="results"):
     # Opening file from file path
@@ -32,9 +32,9 @@ if __name__ == "__main__":
     ds_name = st.text_input("Dataset Name", value="My Dataset")
 
     uploaded_file = st.file_uploader("Results table", type=["csv", "tsv", "xls", "xlsx"])
-    st.markdown("""Upload a file containing the results of the model. The file should contain the following columns:   
-                - `candx_days`: Days between exam and cancer diagnosis. '-1' indicates no cancer diagnosis.  
-                - `fup_days`: Days between exam and last follow-up.   
+    st.markdown(f"""Upload a file containing the results of the model. The file should contain the following columns:   
+                - `{DIAGNOSIS_DAYS_COL}`: Days between exam and cancer diagnosis. '-1' indicates no cancer diagnosis.  
+                - `{FOLLOWUP_DAYS_COL}`: Days between exam and last follow-up.   
                 - `Year1`: Model prediction for year 1.  
                 - `Year2`: Model prediction for year 2.  
                 - `Year3`: Model prediction for year 3.  
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     """)
 
     # Example data file
-    example_data_file_path = "data/sybil_ensemble_for_eval_test.csv"
+    example_data_file_path = "data/general_eval_demo_data.csv"
     example_data_file_name = example_data_file_path.split("/")[-1]
     with open(example_data_file_path, "rb") as file:
         data_bytes = file.read()

@@ -19,7 +19,10 @@ import general_eval_lib as gel
 import src.utils as utils
 from src.general_eval_lib import plot_roc_prc
 
-DAYS_PER_YEAR = 365.25
+DAYS_PER_YEAR = 365
+
+DIAGNOSIS_DAYS_COL = "Days_to_Cancer"
+FOLLOWUP_DAYS_COL = "Days_Followup"
 
 
 def _get_parser():
@@ -94,7 +97,7 @@ def _gen_year_vec(row, diagnosis_days_col, followup_days_col, max_followup=5):
     days_to_cancer = int(row[diagnosis_days_col])
     years_to_cancer = int(days_to_cancer // DAYS_PER_YEAR) if days_to_cancer > -1 else 100
 
-    y = years_to_cancer < max_followup
+    y = years_to_cancer <= max_followup
     y_seq = np.zeros(max_followup)
     if y:
         # time_at_event = years_to_cancer
@@ -249,13 +252,13 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
 
 def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85):
     # Column names
-    diagnosis_days_col = "candx_days"
-    followup_days_col = "fup_days"
+    diagnosis_days_col = DIAGNOSIS_DAYS_COL
+    followup_days_col = FOLLOWUP_DAYS_COL
     # num_years = None
     required_columns = [diagnosis_days_col, followup_days_col]
 
     # Require diagnosis be at least 3 months after exam
-    min_months = 3
+    min_months = 0
     min_days = int(min_months*30)
     categories = [
         {"name": "Year 1", "pred_col": "Year1", "true_col": "true_year1"},
@@ -381,8 +384,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85):
 
 def _run_main_nlst():
     ds_name = "NLST"
-    # input_path = "/Users/silterra/chem_home/Sybil/nlst_predictions/sybil_ensemble_calibrated_v2.csv"
-    input_path = "/Users/silterra/Projects/GeneralEvaluation/data/sybil_ensemble_for_eval_test.csv"
+    input_path = "/Users/silterra/Projects/GeneralEvaluation/data/nlst_sybil_ensemble_for_eval_test.csv"
 
     run_full_eval(ds_name, input_path, split_col="Year")
 
