@@ -28,20 +28,23 @@ FOLLOWUP_DAYS_COL = "Days_Followup"
 def _get_parser():
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--patient_table", default=None, required=True,
-                        type=str, help="Path to the file containing information on a per-patient basis "
-                                       "(one patient per row). CSV format.")
 
-    parser.add_argument("--exam_table", default=None, required=True,
+    parser.add_argument("--ds_name", default="My Dataset", required=False,
+                        type=str, help="Name of dataset. Used in figure titles.")
+
+    parser.add_argument("--input_path", default=None, required=True,
                         type=str, help="Path to the file containing information on a per-exam basis"
                                        "(one exam per row). CSV format.")
 
     parser.add_argument("--output_path", default=None,
                         type=str, help="Path to save the output report file.")
 
-    parser.add_argument("--split_col", default=None,
+    parser.add_argument("--split_col", default="Year",
                         type=str, help="Column to use for subdividing data into subsets. "
                                        "Analysis will be repeated across each unique value of this column.")
+
+    parser.add_argument("--recall_target", default=0.85,
+                        type=str, help="Target recall value for the model.")
 
     return parser
 
@@ -250,7 +253,7 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
         pdf_pages.savefig(fig)
         # plt.show()
 
-def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85):
+def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85, output_path=None):
     # Column names
     diagnosis_days_col = DIAGNOSIS_DAYS_COL
     followup_days_col = FOLLOWUP_DAYS_COL
@@ -275,7 +278,8 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85):
         {"name": "Balanced Accuracy", "metric": "balanced_accuracy", "direction": "max"},
     ]
 
-    output_path = os.path.join(os.path.dirname(input_path), f"{ds_name} evaluation report.pdf")
+    if output_path is None:
+        output_path = os.path.join(os.path.dirname(input_path), f"{ds_name} evaluation report.pdf")
 
     input_name = os.path.basename(input_path)
     input_df = gel.load_input_df(input_name, input_path, comment="#")
@@ -384,11 +388,8 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85):
     print(f"Saved evaluation report to {output_path}")
     return output_path, all_metrics_df
 
-def _run_main_nlst():
-    ds_name = "NLST"
-    input_path = "/Users/silterra/Projects/GeneralEvaluation/data/nlst_sybil_ensemble_for_eval_test.csv"
-
-    run_full_eval(ds_name, input_path, split_col="Year")
 
 if True and __name__ == "__main__":
-    _run_main_nlst()
+    args= _get_parser().parse_args()
+    run_full_eval(args.ds_name, args.input_path, split_col=args.split_col, recall_target=args.recall_target,
+                  output_path=args.output_path)
