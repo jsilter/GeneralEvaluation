@@ -39,7 +39,7 @@ This project is a simple Streamlit web application designed to evaluate the perf
     pip install .
     ```
 
-## Usage
+## Install and run
 
 1. Run the Streamlit app:
     ```sh
@@ -50,7 +50,7 @@ This project is a simple Streamlit web application designed to evaluate the perf
 
 3. Follow the instructions on the web app to upload your results table and run the evaluation.
 
-## Usage with pipx
+###  Install and run with pipx
 
 You can also install the package using [pipx](https://pipx.pypa.io/stable/) to run the command-line tool without activating the virtual environment.
 ```shell
@@ -60,10 +60,27 @@ pipx install .
 general-eval
 ```
 
-## File Structure
+# Usage
 
-- `general_eval/main.py`: Contains the main evaluation logic and functions. This can also be used as a standalone command-line tool. Run `python general_eval/main.py --help` for more information.
-- `general_eval/app.py`: Streamlit web app for user interaction and displaying results.
+1. Upload a results table in CSV, TSV, XLS, or XLSX format.
+2. Adjust the target recall, if desired. The default value is `0.85`.
+3. Click the "Run Evaluation" button.
+4. Download the PDF report and the CSV file with overall metrics.
+
+## Input Data Format
+
+The input data should be a table with the following columns:
+Upload a file containing the results of the model. The file should contain the following columns:   
+ - `Days_to_Cancer`: Days between exam and cancer diagnosis. '-1' indicates no cancer diagnosis.  
+ - `Days_Followup`: Days between exam and latest follow-up.   
+ - `Year1`: Model prediction for year 1.  
+ - `Year2`: Model prediction for year 2.  
+ - `Year3`: Model prediction for year 3.  
+ - `Year4`: Model prediction for year 4.  
+ - `Year5`: Model prediction for year 5.  
+ - `Year6`: Model prediction for year 6. (optional)
+
+See the example data file in the `data` directory for reference.
 
 ## Example Data
 
