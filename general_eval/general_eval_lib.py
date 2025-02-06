@@ -193,7 +193,10 @@ def binary_metrics_by_threshold(y_true, y_pred, thresholds):
     _tmp2 = metrics_df["FP"] / metrics_df["N"]
     _tmp3 = metrics_df["threshold"] / (1.0 - metrics_df["threshold"])
     metrics_df["net_benefit"] = _tmp1 - (_tmp2*_tmp3)
-    metrics_df["_net_benefit_treat_all"] = _tmp1 - (_tmp2.iloc[0])*_tmp3
+    # The null operation of treating all patients, aka consider all patients positive
+    # The "false positives" would therefore be the total number of negatives, which is the sum of TN and FP at each threshold
+    _act_neg_rate = (metrics_df["TN"] + metrics_df["FP"])/metrics_df["N"]
+    metrics_df["_net_benefit_treat_all"] = _tmp1 - (_act_neg_rate*_tmp3)
 
     return metrics_df
 
