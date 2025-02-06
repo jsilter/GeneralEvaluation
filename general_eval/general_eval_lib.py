@@ -17,7 +17,7 @@ def load_input_df(name, content, **kwargs):
         input_df = pd.read_csv(content, sep=",", **kwargs)
     elif name.endswith(".tsv"):
         input_df = pd.read_csv(content, sep="\t", **kwargs)
-    elif name.endswith("xlsx"):
+    elif name.endswith("xlsx") or name.endswith("xls"):
         input_df = pd.read_excel(content, **kwargs)
     else:
         raise ValueError(f"Unknown extension in file {name}")
@@ -186,6 +186,13 @@ def binary_metrics_by_threshold(y_true, y_pred, thresholds):
 
     metrics_df["N"] = np.sum(full_conf_matr[:, :, 0])
 
+    # https://pmc.ncbi.nlm.nih.gov/articles/PMC10454914/
+    # Net benefit = (TP / N) - (FP / N)*(P_t)/(1-P_t)
+    _tmp1 = metrics_df["TP"] / metrics_df["N"]
+    _tmp2 = metrics_df["FP"] / metrics_df["N"]
+    _tmp3 = metrics_df["threshold"] / (1.0 - metrics_df["threshold"])
+    metrics_df["net_benefit"] = _tmp1 - (_tmp2*_tmp3)
+
     return metrics_df
 
 def calc_all_metrics(curves_by_split, split_col="split", all_split_names=None):
@@ -225,7 +232,7 @@ def plot_binary_metrics(metrics_df, title_prefix=""):
     fig.suptitle(f"{title_prefix} Binary Metrics")
     figures = [fig]
     
-    sep_columns = ["relative_risk"]
+    sep_columns = ["relative_risk", "net_benefit"]
     for cp in sep_columns:
         fig = plt.figure()
         plt.plot(metrics_df[x_column], metrics_df[cp], label=pretty_str(cp))
@@ -234,7 +241,8 @@ def plot_binary_metrics(metrics_df, title_prefix=""):
         # _ = plt.legend()
         figures.append(fig)
 
-    fig.suptitle(f"{title_prefix} Relative Risk")
+        cur_title = cp.replace("_", " ").capitalize()
+        fig.suptitle(f"{title_prefix} {cur_title}")
 
     return figures
 
