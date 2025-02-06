@@ -50,6 +50,16 @@ This project is a simple Streamlit web application designed to evaluate the perf
 
 3. Follow the instructions on the web app to upload your results table and run the evaluation.
 
+## Usage with pipx
+
+You can also install the package using [pipx](https://pipx.pypa.io/stable/) to run the command-line tool without activating the virtual environment.
+```shell
+git clone https://github.com/reginabarzilaygroup/GeneralEvaluation
+cd GeneralEvaluation
+pipx install .
+general-eval
+```
+
 ## File Structure
 
 - `general_eval/main.py`: Contains the main evaluation logic and functions. This can also be used as a standalone command-line tool. Run `python general_eval/main.py --help` for more information.
