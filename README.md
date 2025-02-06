@@ -69,6 +69,10 @@ general-eval
 
 An example data file is provided in the `data` directory. You can download it from the web app to see the expected format of the input data.
 
+## Methods
+
+The performance is evaluated using multiple metrics. Area-under-the-curve (AUC) and precision-recall curve (PRC) are calculated with [scikit-learn](https://scikit-learn.org/stable/) functions. The "Net Benefit" is calculated according to the definition in [Piovani et al](https://pmc.ncbi.nlm.nih.gov/articles/PMC10454914/).
+
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for more details.

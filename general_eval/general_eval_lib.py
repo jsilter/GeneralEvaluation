@@ -6,6 +6,7 @@ warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 import numpy as np
 import matplotlib
 from matplotlib import pyplot as plt
+import matplotlib.ticker as ticker
 import pandas as pd
 import sklearn
 import seaborn as sns
@@ -192,6 +193,7 @@ def binary_metrics_by_threshold(y_true, y_pred, thresholds):
     _tmp2 = metrics_df["FP"] / metrics_df["N"]
     _tmp3 = metrics_df["threshold"] / (1.0 - metrics_df["threshold"])
     metrics_df["net_benefit"] = _tmp1 - (_tmp2*_tmp3)
+    metrics_df["_net_benefit_treat_all"] = _tmp1 - (_tmp2.iloc[0])*_tmp3
 
     return metrics_df
 
@@ -214,6 +216,8 @@ def calc_all_metrics(curves_by_split, split_col="split", all_split_names=None):
 def plot_binary_metrics(metrics_df, title_prefix=""):
     x_column = "threshold"
     joint_columns_to_plot = ["recall", "PPV", "specificity", "f1_score", "balanced_accuracy"]
+    xrange = [0.0, 0.20]
+    axis_formatter = ticker.FuncFormatter(lambda x, _: f'{x:.2f}')
     
     def pretty_str(instr):
         tmp = instr.replace("_", " ")
@@ -226,8 +230,13 @@ def plot_binary_metrics(metrics_df, title_prefix=""):
         plt.plot(metrics_df[x_column], metrics_df[cp], label=pretty_str(cp))
 
     _ = plt.xlabel(pretty_str(x_column))
-    _ = plt.legend(loc='upper right', bbox_to_anchor=(0.99, 0.7), borderaxespad=0.)
-    # plt.tight_layout()
+    # _ = plt.legend(loc='upper right', bbox_to_anchor=(0.99, 0.7), borderaxespad=0.)
+    _ = plt.legend(loc='lower right')
+    _ = plt.xlim(*xrange)
+
+    ax = plt.gca()
+    ax.xaxis.set_major_formatter(axis_formatter)
+    ax.yaxis.set_major_formatter(axis_formatter)
 
     fig.suptitle(f"{title_prefix} Binary Metrics")
     figures = [fig]
@@ -235,14 +244,24 @@ def plot_binary_metrics(metrics_df, title_prefix=""):
     sep_columns = ["relative_risk", "net_benefit"]
     for cp in sep_columns:
         fig = plt.figure()
+        ax = plt.gca()
         plt.plot(metrics_df[x_column], metrics_df[cp], label=pretty_str(cp))
 
+        if cp == "net_benefit":
+            cy = "_net_benefit_treat_all"
+            treat_all = metrics_df[cy]
+            keep_locs = np.argwhere(treat_all >= 0).flatten()
+            plt.plot(metrics_df[x_column].iloc[keep_locs], metrics_df[cy].iloc[keep_locs], "k--", label="Treat All")
+
         _ = plt.xlabel(pretty_str(x_column))
-        # _ = plt.legend()
+        _ = plt.xlim(*xrange)
         figures.append(fig)
 
         cur_title = cp.replace("_", " ").capitalize()
         fig.suptitle(f"{title_prefix} {cur_title}")
+
+        ax.xaxis.set_major_formatter(axis_formatter)
+        # ax.yaxis.set_major_formatter(axis_formatter)
 
     return figures
 
