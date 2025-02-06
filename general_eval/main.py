@@ -15,9 +15,8 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
 
-import general_eval_lib as gel
-import src.utils as utils
-from src.general_eval_lib import plot_roc_prc
+import general_eval.general_eval_lib as gel
+from general_eval.general_eval_lib import plot_roc_prc
 
 DAYS_PER_YEAR = 365
 
@@ -47,14 +46,6 @@ def _get_parser():
                         type=str, help="Target recall value for the model.")
 
     return parser
-
-def _to_dt(instr):
-    if instr is None or pd.isna(instr):
-        return instr
-    elif isinstance(instr, (datetime.datetime, pd.Timestamp)):
-        return instr
-
-    return utils.parse_date(instr)
 
 def _is_positive_diag(days):
     if days is None:

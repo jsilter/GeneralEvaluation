@@ -1,16 +1,19 @@
 #!/usr/bin/env python
 
 __doc__ = """
-Simple streamlit web app for evaluating the performance of a model
+Simple streamlit web app for evaluating the performance of a risk prediction model. Intended for use with Mirai and Sybil.
 """
 
 import base64
 import os
+import subprocess
 import tempfile
 
 import streamlit as st
 
-from main import run_full_eval, DIAGNOSIS_DAYS_COL, FOLLOWUP_DAYS_COL
+from general_eval.main import run_full_eval, DIAGNOSIS_DAYS_COL, FOLLOWUP_DAYS_COL
+
+file_path = __file__
 
 def displayPDF(file_path, name="results"):
     # Opening file from file path
@@ -26,7 +29,7 @@ def displayPDF(file_path, name="results"):
     # Displaying File
     st.markdown(pdf_display, unsafe_allow_html=True)
 
-if __name__ == "__main__":
+def main_app():
     st.title("Model Performance Evaluation")
     st.markdown("""This is a simple web app to evaluate the performance of a classification model.   
              Make sure your data is formatted properly before uploading (see below).""")
@@ -98,3 +101,10 @@ if __name__ == "__main__":
         # Clean up temporary files
         os.remove(temp_file_path)
         os.remove(pdf_output_file)
+
+def streamlit_run():
+    args = ["streamlit", "run", file_path]
+    subprocess.run(args, check=True)
+
+if __name__ == "__main__":
+    main_app()
