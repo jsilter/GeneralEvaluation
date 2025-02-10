@@ -63,7 +63,7 @@ general-eval
 # Usage
 
 1. Upload a results table in CSV, TSV, XLS, or XLSX format.
-2. Adjust the recall target, if desired. The default value is `0.85`.
+2. The default value is `0.85`. If desired, you may adjust the recall target. 
 3. Click the "Run Evaluation" button.
 4. Download the PDF report and the CSV file with overall metrics.
 
