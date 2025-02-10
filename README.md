@@ -14,7 +14,7 @@ This project is a simple Streamlit web application designed to evaluate the perf
 
 ## Requirements
 
-- Python 3.11 and above.
+- Python 3.11 or above
 - Streamlit
 - Pandas
 - Seaborn
