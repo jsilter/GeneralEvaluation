@@ -283,8 +283,9 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85, out
         category_names = [cat["pred_col"] for cat in categories]
         raise ValueError(f"Input file does not contain any of the expected categories: {category_names}")
     num_years = len(keep_categories)
+    categories = keep_categories
 
-    numeric_cols = [diagnosis_days_col, followup_days_col] + [cat["pred_col"] for cat in keep_categories]
+    numeric_cols = [diagnosis_days_col, followup_days_col] + [cat["pred_col"] for cat in categories]
     input_df[numeric_cols] = input_df[numeric_cols].apply(pd.to_numeric, errors='coerce')
 
     for rc in required_columns:
