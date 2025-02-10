@@ -83,7 +83,7 @@ Upload a file containing the results of the model. The file should contain the f
  - `Year5`: Model prediction for year 5.  
  - `Year6`: Model prediction for year 6. (optional)
 
-If there are missing columns, you will see an error occur. Any additional columns will be ignored.
+Remove PHI data before uploading. If there are missing columns, you will see an error occur. Any additional columns will be ignored.
 
 See the example data file in the `data` directory for reference.
 
