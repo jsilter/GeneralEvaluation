@@ -22,6 +22,8 @@ This project is a simple Streamlit web application designed to evaluate the perf
 
 ## Installation
 
+The following steps should be completed on a terminal.  
+
 1. Clone the repository:
     ```sh
     git clone https://github.com/reginabarzilaygroup/GeneralEvaluation
@@ -34,12 +36,12 @@ This project is a simple Streamlit web application designed to evaluate the perf
     source venv/bin/activate  # On Windows use `venv\Scripts\activate`
     ```
 
-3. Install the package, which will install required packages:
+3. Install the package, which will install all dependencies as well:
     ```sh
     pip install .
     ```
 
-## Install and run
+## Run
 
 1. Run the Streamlit app:
     ```sh
