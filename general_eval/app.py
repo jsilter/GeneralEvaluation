@@ -49,7 +49,7 @@ def main_app():
                 - `Year5`: Model prediction for year 5.  
                 - `Year6`: Model prediction for year 6. (optional)
                 
-Remove PHI data before uploading. If there are missing columns, you will see an error occur. Any additional columns will be ignored.
+Remove PHI before uploading. If there are missing columns, you will see an error occur. Any additional columns will be ignored.
     """)
 
     # Example data file
@@ -107,7 +107,7 @@ Remove PHI data before uploading. If there are missing columns, you will see an 
         os.remove(pdf_output_file)
 
 def streamlit_run():
-    args = ["streamlit", "run", file_path]
+    args = ["streamlit", "run", file_path, "--browser.gatherUsageStats", "false"]
     subprocess.run(args, check=True)
 
 if __name__ == "__main__":

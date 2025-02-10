@@ -4,11 +4,9 @@
 
 This project is a simple Streamlit web application designed to evaluate the performance of a risk prediction model. It is intended for use with Mirai and Sybil. The application allows users to upload a results table, run evaluations, and generate performance reports in PDF format.
 
-For installation instructions, see the [README.md](README.md) file.
-
 # Usage
 
-The following steps assume that the Streamlit app has been installed and launched. See the [Installation](#installation) section for details)
+The following steps assume that the Streamlit app has been installed and launched. For installation instructions, see the [INSTALL.md](INSTALL.md) file.
 
 1. Prepare your results from Mirai or Sybil. See the [Input Data Format](#input-data-format) section for details.
 2. Upload a results table in CSV, TSV, XLS, or XLSX format.
