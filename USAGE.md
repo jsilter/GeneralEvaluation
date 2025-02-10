@@ -10,10 +10,9 @@ For installation instructions, see the [README.md](README.md) file.
 
 The following steps assume that the Streamlit app has been installed and launched. See the [Installation](#installation) section for details)
 
-0. Visit the web app. If running on a local machine, the default URL is `http://localhost:8501`.
 1. Prepare your results from Mirai or Sybil. See the [Input Data Format](#input-data-format) section for details.
 2. Upload a results table in CSV, TSV, XLS, or XLSX format.
-3. The default recall target is `0.85`. You can change this value if desired.
+3. The default recall target is `0.85`. If desired, you may adjust the recall target. 
 4. Click the "Run Evaluation" button.
 5. Download the PDF report and the CSV file with overall metrics.
 
@@ -30,11 +29,13 @@ Upload a file containing the results of the model. The file should contain the f
  - `Year5`: Model prediction for year 5.  
  - `Year6`: Model prediction for year 6. (optional)
 
-See the example data file in the `data` directory for reference.
+If there are missing columns, you will see an error occur. Any additional columns will be ignored.
+
+See the example data file in the `data` folder for reference.
 
 ## Example Data
 
-An example data file is provided in the `data` directory. You can download it from the web app to see the expected format of the input data.
+An example data file is provided in the `data` folder. You can download it from the web app to see the expected format of the input data.
 
 ## Methods
 

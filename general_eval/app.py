@@ -10,6 +10,8 @@ import subprocess
 import tempfile
 
 import streamlit as st
+st.set_page_config(page_title='General Evaluation', layout = 'wide', initial_sidebar_state = 'auto')
+
 
 from general_eval.main import run_full_eval, DIAGNOSIS_DAYS_COL, FOLLOWUP_DAYS_COL
 
