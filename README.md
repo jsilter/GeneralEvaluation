@@ -14,7 +14,7 @@ This project is a simple Streamlit web application designed to evaluate the perf
 
 ## Requirements
 
-- Python 3.11
+- Python 3.11 and above.
 - Streamlit
 - Pandas
 - Seaborn
@@ -22,19 +22,19 @@ This project is a simple Streamlit web application designed to evaluate the perf
 
 ## Installation
 
-1. Clone the repository:
+1. Open a terminal and clone the repository:
     ```sh
     git clone https://github.com/reginabarzilaygroup/GeneralEvaluation
     cd GeneralEvaluation
     ```
 
-2. Create a virtual environment and activate it:
+2. Create a virtual environment using the code below and activate it:
     ```sh
     python -m venv venv
     source venv/bin/activate  # On Windows use `venv\Scripts\activate`
     ```
 
-3. Install the package, which will install required packages:
+3. Install the package, which will install required packages (listed above, except for Python):
     ```sh
     pip install .
     ```
@@ -63,7 +63,7 @@ general-eval
 # Usage
 
 1. Upload a results table in CSV, TSV, XLS, or XLSX format.
-2. Adjust the target recall, if desired. The default value is `0.85`.
+2. Adjust the recall target, if desired. The default value is `0.85`.
 3. Click the "Run Evaluation" button.
 4. Download the PDF report and the CSV file with overall metrics.
 
@@ -80,11 +80,13 @@ Upload a file containing the results of the model. The file should contain the f
  - `Year5`: Model prediction for year 5.  
  - `Year6`: Model prediction for year 6. (optional)
 
+If there are missing columns, you will see an error occur. Any additional columns will be ignored.
+
 See the example data file in the `data` directory for reference.
 
 ## Example Data
 
-An example data file is provided in the `data` directory. You can download it from the web app to see the expected format of the input data.
+An example data file is provided in the `data` folder. You can download it from the web app to see the expected format of the input data.
 
 ## Methods
 
