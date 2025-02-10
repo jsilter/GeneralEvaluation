@@ -48,6 +48,8 @@ def main_app():
                 - `Year4`: Model prediction for year 4.  
                 - `Year5`: Model prediction for year 5.  
                 - `Year6`: Model prediction for year 6. (optional)
+                
+                Please remove any PHI from the data before uploading.
     """)
 
     # Example data file
