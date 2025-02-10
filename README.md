@@ -52,16 +52,6 @@ The following steps should be completed on a terminal.
 
 3. Follow the instructions on the web app to upload your results table and run the evaluation.
 
-###  Install and run with pipx
-
-You can also install the package using [pipx](https://pipx.pypa.io/stable/) to run the command-line tool without activating the virtual environment.
-```shell
-git clone https://github.com/reginabarzilaygroup/GeneralEvaluation
-cd GeneralEvaluation
-pipx install .
-general-eval
-```
-
 # Usage
 
 1. Prepare your results from Mirai or Sybil. See the [Input Data Format](#input-data-format) section for details.

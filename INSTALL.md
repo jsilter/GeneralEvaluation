@@ -39,7 +39,7 @@ This project is a simple Streamlit web application designed to evaluate the perf
     pip install .
     ```
 
-## Install and run
+## Run
 
 1. Run the Streamlit app:
     ```sh
