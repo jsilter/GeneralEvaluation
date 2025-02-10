@@ -49,7 +49,7 @@ def main_app():
                 - `Year5`: Model prediction for year 5.  
                 - `Year6`: Model prediction for year 6. (optional)
                 
-                Please remove any PHI from the data before uploading.
+Remove PHI data before uploading. If there are missing columns, you will see an error occur. Any additional columns will be ignored.
     """)
 
     # Example data file
