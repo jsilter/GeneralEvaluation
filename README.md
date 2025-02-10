@@ -62,10 +62,11 @@ general-eval
 
 # Usage
 
-1. Upload a results table in CSV, TSV, XLS, or XLSX format.
-2. Adjust the target recall, if desired. The default value is `0.85`.
-3. Click the "Run Evaluation" button.
-4. Download the PDF report and the CSV file with overall metrics.
+1. Prepare your results from Mirai or Sybil. See the [Input Data Format](#input-data-format) section for details.
+2. Upload a results table in CSV, TSV, XLS, or XLSX format.
+3. Adjust the target recall, if desired. The default value is `0.85`.
+4. Click the "Run Evaluation" button.
+5. Download the PDF report and the CSV file with overall metrics.
 
 ## Input Data Format
 
