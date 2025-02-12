@@ -1,0 +1,8 @@
+# streamlit cloud requires a requirements.txt file
+matplotlib
+numpy>=1.24.1
+pandas
+scikit-learn
+seaborn
+streamlit
+tqdm
