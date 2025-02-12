@@ -7,7 +7,12 @@ Simple streamlit web app for evaluating the performance of a risk prediction mod
 import base64
 import os
 import subprocess
+import sys
 import tempfile
+
+file_path = os.path.abspath(__file__)
+sys.path.append(os.path.dirname(file_path))
+sys.path.append(os.path.dirname(os.path.dirname(file_path)))
 
 import streamlit as st
 st.set_page_config(page_title='General Evaluation', layout = 'wide', initial_sidebar_state = 'auto')
@@ -15,7 +20,7 @@ st.set_page_config(page_title='General Evaluation', layout = 'wide', initial_sid
 
 from general_eval.main import run_full_eval, DIAGNOSIS_DAYS_COL, FOLLOWUP_DAYS_COL
 
-file_path = __file__
+
 
 def displayPDF(file_path, name="results"):
     # Opening file from file path
