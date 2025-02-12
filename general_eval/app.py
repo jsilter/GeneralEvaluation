@@ -16,7 +16,9 @@ sys.path.append(os.path.dirname(os.path.dirname(file_path)))
 
 import streamlit as st
 st.set_page_config(page_title='General Evaluation', layout = 'wide', initial_sidebar_state = 'auto')
-import streamlit.components.v1 as components
+# Initialize session state
+if "analysis_done" not in st.session_state:
+    st.session_state.analysis_done = False
 
 
 from general_eval.main import run_full_eval, DIAGNOSIS_DAYS_COL, FOLLOWUP_DAYS_COL
@@ -37,6 +39,18 @@ def displayPDF(pdf_file_path, name="results"):
     # Displaying File
     st.markdown(pdf_display, unsafe_allow_html=True)
 
+def init_state_variables():
+    st.session_state.analysis_done = False
+    st.session_state.pdf_output_file = None
+    st.session_state.all_metrics_df = None
+
+def clear_files():
+    pdf_output_file = st.session_state.get("pdf_output_file", None)
+    if pdf_output_file is not None:
+        os.remove(st.session_state.pdf_output_file)
+        st.session_state.pdf_output_file = None
+
+
 def main_app():
     st.title("Model Performance Evaluation")
     st.markdown("""This is a simple web app to evaluate the performance of a classification model.   
@@ -45,6 +59,10 @@ def main_app():
     ds_name = st.text_input("Dataset Name", value="My Dataset")
 
     uploaded_file = st.file_uploader("Results table", type=["csv", "tsv", "xls", "xlsx"])
+    if uploaded_file is None:
+        clear_files()
+        init_state_variables()
+
     st.markdown(f"""Upload a file containing the results of the model. The file should contain the following columns:   
                 - `{DIAGNOSIS_DAYS_COL}`: Days between exam and cancer diagnosis. '-1' indicates no cancer diagnosis.  
                 - `{FOLLOWUP_DAYS_COL}`: Days between exam and latest follow-up.   
@@ -76,19 +94,24 @@ Remove PHI before uploading. If there are missing columns, you will see an error
     run_button = st.button("Run Evaluation", disabled=uploaded_file is None)
 
     if run_button and uploaded_file is not None:
-        st.write("File uploaded, processing...")
+        proc_str = "File uploaded, processing..."
+        with st.spinner(proc_str):
+            # Save the uploaded file to a temporary location
+            with tempfile.NamedTemporaryFile(suffix=uploaded_file.name, delete=True) as temp_file:
+                temp_file.write(uploaded_file.getvalue())
+                temp_file_path = temp_file.name
+                pdf_output_file, all_metrics_df = run_full_eval(ds_name, temp_file_path, recall_target=recall_target)
 
-        # Save the uploaded file to a temporary location
-        with tempfile.NamedTemporaryFile(suffix=uploaded_file.name, delete=False) as temp_file:
-            temp_file.write(uploaded_file.getvalue())
-            temp_file_path = temp_file.name
+            st.success("Evaluation complete!")
+            st.session_state.analysis_done = True
+            st.session_state.pdf_output_file = pdf_output_file
+            st.session_state.all_metrics_df = all_metrics_df
 
-        pdf_output_file, all_metrics_df = run_full_eval(ds_name, temp_file_path, recall_target=recall_target)
-        st.write("Evaluation complete!")
 
+    if st.session_state.analysis_done:
         # Download button for overall metrics table
         metrics_file_name = f"{ds_name.strip()} metrics.csv"
-        metrics_csv = all_metrics_df.to_csv(index=False).encode()
+        metrics_csv = st.session_state.all_metrics_df.to_csv(index=False).encode()
         st.download_button(
             label="Download Metrics",
             data=metrics_csv,
@@ -96,6 +119,7 @@ Remove PHI before uploading. If there are missing columns, you will see an error
             mime="text/csv"
         )
 
+        pdf_output_file = st.session_state.pdf_output_file
         pdf_report_file_name = pdf_output_file.split("/")[-1]
 
         with open(pdf_output_file, "rb") as file:
@@ -103,14 +127,12 @@ Remove PHI before uploading. If there are missing columns, you will see an error
                 label="Download PDF",
                 data=file,
                 file_name=pdf_report_file_name,
-                mime="application/pdf"
+                mime="application/pdf",
             )
 
-        displayPDF(pdf_output_file)
+        # This is a little tricky to get to display right
+        # displayPDF(pdf_output_file)
 
-        # Clean up temporary files
-        os.remove(temp_file_path)
-        os.remove(pdf_output_file)
 
 def streamlit_run():
     args = ["streamlit", "run", file_path, "--browser.gatherUsageStats", "false"]
