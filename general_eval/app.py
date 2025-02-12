@@ -16,22 +16,23 @@ sys.path.append(os.path.dirname(os.path.dirname(file_path)))
 
 import streamlit as st
 st.set_page_config(page_title='General Evaluation', layout = 'wide', initial_sidebar_state = 'auto')
+import streamlit.components.v1 as components
 
 
 from general_eval.main import run_full_eval, DIAGNOSIS_DAYS_COL, FOLLOWUP_DAYS_COL
 
 
 
-def displayPDF(file_path, name="results"):
+def displayPDF(pdf_file_path, name="results"):
     # Opening file from file path
-    with open(file_path, "rb") as f:
+    with open(pdf_file_path, "rb") as f:
         base64_pdf = base64.b64encode(f.read()).decode('utf-8')
 
     width = 1200
     height = 800
 
     # Embedding PDF in HTML
-    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" name="{name}" width="{width}" height="{height}" type="application/pdf"></iframe>'
+    pdf_display = F'<embed src="data:application/pdf;base64,{base64_pdf}" name="{name}" width="{width}" height="{height}" type="application/pdf"></embed>'
 
     # Displaying File
     st.markdown(pdf_display, unsafe_allow_html=True)
