@@ -10,7 +10,7 @@ The following steps assume that the Streamlit app has been installed and launche
 
 1. Prepare your results from Mirai or Sybil. See the [Input Data Format](#input-data-format) section for details.
 2. Upload a results table in CSV, TSV, XLS, or XLSX format.
-3. The default recall target is `0.85`. If desired, you may adjust the recall target. 
+3. The default sensitivity target is `0.85`. If desired, you may adjust the sensitivity target. 
 4. Click the "Run Evaluation" button.
 5. Download the PDF report and the CSV file with overall metrics.
 
