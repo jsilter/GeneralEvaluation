@@ -167,6 +167,37 @@ def create_basic_stats_table(input_df, diagnosis_days_col):
 
     return fig, basic_stats_df
 
+def create_perf_stats_table(stats_by_cat):
+    perf_df = pd.DataFrame(stats_by_cat).T
+    perf_df = perf_df[["auc", "pr_auc", "N"]]
+    perf_df.columns = ["AUROC", "AUPRC", "N"]
+    perf_df = perf_df.round(4)
+    perf_df["N"] = perf_df["N"].astype(int)
+    perf_df = perf_df.reset_index()
+
+    # Create a figure and axis
+    fig, ax = plt.subplots(figsize=(8, 3))  # Adjust the size as needed
+    # Create the table
+    df = perf_df
+    table = plt.table(cellText=df.values,
+                      colLabels=df.columns,
+                      cellLoc='center', loc='center')
+    col_width = 1.0 / df.shape[1]
+    col_height = 0.1
+    for key, cell in table.get_celld().items():
+        if key[0] == 0:
+            cell.set_text_props(fontweight='bold')
+        cell.set_width(col_width)
+        cell.set_height(col_height)
+
+    ax.add_table(table)
+    plt.title("Overall Performance by Year", pad=16, fontweight='bold')
+    plt.subplots_adjust(top=0.80)
+    ax.axis('tight')
+    ax.axis('off')
+
+    return fig, perf_df
+
 def generate_standards_df(all_metrics_df, standards, categories, split_col):
     # Print out table of thresholds and stats
 
@@ -210,14 +241,17 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
 
         # Re-arrange column order
         custom_column_order = [
-            "standard", split_col, "threshold", "f1_score", "balanced_accuracy",
-            "PPV", "NPV", "recall", "LR+", "N", "TP", "FP", "TN", "FN"
+            "standard", split_col, "threshold", "sensitivity", "precision", "specificity",
+            "LR+", "N", "TP", "FP", "TN", "FN"
         ]
         df = df[custom_column_order]
         custom_column_labels = list(df.columns)
-        cust_mapping = [("f1_score", "F1"), ("balanced_accuracy", "Balanced Acc."), ("recall", "Recall")]
+        cust_mapping = [("f1_score", "F1"), ("balanced_accuracy", "Balanced Acc."), ("sensitivity", "Sensitivity")]
         for old, new in cust_mapping:
-            custom_column_labels[custom_column_labels.index(old)] = new
+            if old in custom_column_labels:
+                custom_column_labels[custom_column_labels.index(old)] = new
+        # Capitalize column names
+        custom_column_labels = [col.capitalize() if len(col) >= 4 else col.upper() for col in custom_column_labels]
 
         table = plt.table(
             cellText=df.values,
@@ -244,7 +278,36 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
         pdf_pages.savefig(fig)
         # plt.show()
 
-def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85, output_path=None):
+def glossary_of_terms():
+    # Print definitions of terms used in the report
+    fig, ax = plt.subplots()
+    ax.axis('off')
+
+    ax.text(0.01, 0.95, "Glossary of Terms", fontsize=16, fontweight='bold')
+    other_text = """
+    Sensitivity: The proportion of true positive cases that are correctly 
+    identified by the model. Also known as "Recall".
+    
+    Specificity: The proportion of true negative cases that are correctly 
+    identified by the model. Also known as "True Negative Rate".
+    
+    Precision: The proportion of positive cases identified by the model 
+    that are actually positive. Also known as "Positive Predictive Value".
+    
+    AUROC: Area Under the Receiver Operating Characteristic curve.
+    A random classifier has an AUROC of 0.5, 
+    while a perfect classifier has an AUROC of 1.0.
+    
+    AUPRC: Area Under the Precision-Recall curve.
+    A random classifier has an AUPRC equal to the fraction of 
+    positive cases in the dataset, while a perfect classifier has an AUPRC of 1.0.
+    """
+    ax.text(0.01, 0.9, other_text, fontsize=12, ha="left", va="top")
+    plt.tight_layout()
+
+    return fig
+
+def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85, output_path=None):
     # Column names
     diagnosis_days_col = DIAGNOSIS_DAYS_COL
     followup_days_col = FOLLOWUP_DAYS_COL
@@ -264,9 +327,9 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85, out
     ]
 
     standards = [
-        {"name": f"Recall", "metric": "recall", "direction": "min_diff", "target_value": recall_target},
-        {"name": "F1", "metric": "f1_score", "direction": "max"},
-        {"name": "Balanced Accuracy", "metric": "balanced_accuracy", "direction": "max"},
+        {"name": f"Sensitivity", "metric": "sensitivity", "direction": "min_diff", "target_value": sensitivity_target},
+        # {"name": "F1", "metric": "f1_score", "direction": "max"},
+        # {"name": "Balanced Accuracy", "metric": "balanced_accuracy", "direction": "max"},
     ]
 
     if output_path is None:
@@ -292,7 +355,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85, out
         if rc not in input_df.columns:
             raise ValueError(f"Input file does not contain required column: {rc}")
 
-    # Keep rows where the diagnosis is at least min_months after the exam
+    # Keep rows where the diagnosis is at least min_days after the exam
     def _keep_row(row, min_days=min_days):
         # Keep the negatives
         if _is_negative_diag(row[diagnosis_days_col]):
@@ -322,21 +385,22 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85, out
         curves_by_cat[name], stats_by_cat[name] = gel.calculate_roc(cur_df, true_col, pred_col)
         all_cat_names.append(name)
 
-        num_true = cur_df[true_col].sum()
-        num_total = len(cur_df[true_col] >= 0)
-        # print(f"{name}: {num_true} / {num_total} = {num_true / num_total:.2%}")
-
     all_metrics_df = gel.calc_all_metrics(curves_by_cat, split_col=split_col)
 
     # ------------ Plotting ------------ #
     sns.set_theme(style="darkgrid")
     # Preconfigured values: {paper, notebook, talk, poster}
     sns.set_context("notebook", font_scale=1.0)
-
-    fig, basic_stats_df = create_basic_stats_table(input_df, diagnosis_days_col)
-    # plt.tight_layout()
-
     pdf_pages = PdfPages(output_path)
+
+    # Basic stats table (counts of patients within specific time windows)
+    fig, basic_stats_df = create_basic_stats_table(input_df, diagnosis_days_col)
+
+    pdf_pages.savefig(fig)
+    plt.close(fig)
+
+    # Performance statistics (AUC, ROC) by category
+    fig, overall_perf_df = create_perf_stats_table(stats_by_cat)
     pdf_pages.savefig(fig)
     plt.close(fig)
 
@@ -350,6 +414,10 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85, out
         fig, ax = plot_roc_prc(curves_by_cat, stats_by_cat, f"{ds_name} Validation")
         pdf_pages.savefig(fig)
         plt.close(fig)
+
+    fig = glossary_of_terms()
+    pdf_pages.savefig(fig)
+    plt.close(fig)
 
     # Plot binary metrics by threshold
     for cat in categories:
@@ -383,5 +451,5 @@ def run_full_eval(ds_name, input_path, split_col="Year", recall_target=0.85, out
 
 if True and __name__ == "__main__":
     args= _get_parser().parse_args()
-    run_full_eval(args.ds_name, args.input_path, split_col=args.split_col, recall_target=args.recall_target,
+    run_full_eval(args.ds_name, args.input_path, split_col=args.split_col, sensitivity_target=args.recall_target,
                   output_path=args.output_path)

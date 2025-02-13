@@ -89,7 +89,7 @@ Remove PHI before uploading. If there are missing columns, you will see an error
         mime="text/plain"
     )
 
-    recall_target = st.number_input("Recall Target", value=0.85, help="The target recall value for the model. ")
+    sensitivity_target = st.number_input("Sensitivity Target", value=0.85, help="The target recall/sensitivity value for the model. ")
 
     run_button = st.button("Run Evaluation", disabled=uploaded_file is None)
 
@@ -100,7 +100,7 @@ Remove PHI before uploading. If there are missing columns, you will see an error
             with tempfile.NamedTemporaryFile(suffix=uploaded_file.name, delete=True) as temp_file:
                 temp_file.write(uploaded_file.getvalue())
                 temp_file_path = temp_file.name
-                pdf_output_file, all_metrics_df = run_full_eval(ds_name, temp_file_path, recall_target=recall_target)
+                pdf_output_file, all_metrics_df = run_full_eval(ds_name, temp_file_path, sensitivity_target=sensitivity_target)
 
             st.success("Evaluation complete!")
             st.session_state.analysis_done = True
@@ -130,8 +130,8 @@ Remove PHI before uploading. If there are missing columns, you will see an error
                 mime="application/pdf",
             )
 
-        # This is a little tricky to get to display right
-        # displayPDF(pdf_output_file)
+        # This is a little tricky to get to display right, useful for debugging though
+        displayPDF(pdf_output_file)
 
 
 def streamlit_run():
