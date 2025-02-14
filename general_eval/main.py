@@ -300,7 +300,11 @@ def glossary_of_terms():
     
     AUPRC: Area Under the Precision-Recall curve.
     A random classifier has an AUPRC equal to the fraction of 
-    positive cases in the dataset, while a perfect classifier has an AUPRC of 1.0.
+    positive cases in the dataset, 
+    while a perfect classifier has an AUPRC of 1.0.
+    
+    LR+: The positive likelihood ratio, which is the ratio of the
+    true positive rate to the false positive rate.
     """
     ax.text(0.01, 0.9, other_text, fontsize=12, ha="left", va="top")
     plt.tight_layout()

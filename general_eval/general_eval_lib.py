@@ -219,7 +219,7 @@ def calc_all_metrics(curves_by_split, split_col="split", all_split_names=None):
 
 def plot_binary_metrics(metrics_df, title_prefix=""):
     x_column = "threshold"
-    joint_columns_to_plot = ["precision", "sensitivity", "specificity", "f1_score", "balanced_accuracy"]
+    joint_columns_to_plot = ["precision", "sensitivity", "specificity"]
     xrange = [0.0, 0.20]
     axis_formatter = ticker.FuncFormatter(lambda x, _: f'{x:.2f}')
     
