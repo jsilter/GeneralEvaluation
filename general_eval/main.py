@@ -242,7 +242,7 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
         # Re-arrange column order
         custom_column_order = [
             "standard", split_col, "threshold", "sensitivity", "precision", "specificity",
-            "LR+", "N", "TP", "FP", "TN", "FN"
+            "LR+", "N",
         ]
         df = df[custom_column_order]
         custom_column_labels = list(df.columns)
