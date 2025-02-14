@@ -229,7 +229,7 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
     standard_names = summary_metrics_by_cat_standard["standard"].unique()
     for standard_name in standard_names:
         # Create a figure and axis
-        fig, ax = plt.subplots(figsize=(24, 3))
+        fig, ax = plt.subplots(figsize=(12, 3))
         # ax.axis('tight')
         ax.axis('off')
         side_margin = 0.01
