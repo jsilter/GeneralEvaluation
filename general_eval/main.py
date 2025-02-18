@@ -397,33 +397,33 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
     sns.set_context("notebook", font_scale=1.0)
     pdf_pages = PdfPages(output_path)
 
-    # Basic stats table (counts of patients within specific time windows)
-    fig, basic_stats_df = create_basic_stats_table(input_df, diagnosis_days_col)
+    def _save_and_close_fig(_pdf_pages, _fig):
+        _pdf_pages.savefig(_fig)
+        plt.close(_fig)
 
-    pdf_pages.savefig(fig)
-    plt.close(fig)
+    ### FIGURE Plot ROC Curves
+    fig, ax = plot_roc_prc(curves_by_cat, stats_by_cat, f"{ds_name} Validation")
+    _save_and_close_fig(pdf_pages, fig)
 
-    # Performance statistics (AUC, ROC) by category
+    ### TABLE Performance statistics (AUC, ROC) by category
     fig, overall_perf_df = create_perf_stats_table(stats_by_cat)
-    pdf_pages.savefig(fig)
-    plt.close(fig)
+    _save_and_close_fig(pdf_pages, fig)
 
-    # Tables of thresholds for particular targets
+    ### TABLE Basic stats table (counts of patients within specific time windows)
+    fig, basic_stats_df = create_basic_stats_table(input_df, diagnosis_days_col)
+    _save_and_close_fig(pdf_pages, fig)
+
+    ### TABLEs of thresholds for particular targets
     summary_metrics_by_cat_standard = generate_standards_df(all_metrics_df, standards, categories, split_col)
     plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split_col)
 
-    # Plot ROC Curves
-    plot_roc_curves = True
-    if plot_roc_curves:
-        fig, ax = plot_roc_prc(curves_by_cat, stats_by_cat, f"{ds_name} Validation")
-        pdf_pages.savefig(fig)
-        plt.close(fig)
-
     fig = glossary_of_terms()
-    pdf_pages.savefig(fig)
-    plt.close(fig)
+    _save_and_close_fig(pdf_pages, fig)
 
-    # Plot binary metrics by threshold
+    ### FIGURE
+
+    ### MULTIPLE FIGURES
+    # Loop through categories (ie years) and plot binary metrics and distributions
     for cat in categories:
         split_name = cat["name"]
         true_col = cat["true_col"]
@@ -437,14 +437,16 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
         figures = gel.plot_binary_metrics(metrics_df, fig_name)
 
         for fig in figures:
-            pdf_pages.savefig(fig)
-            plt.close(fig)
+            _save_and_close_fig(pdf_pages, fig)
+
+        # Waffle chart showing distribution of positive/negative cases
+        fig = gel.plot_waffle(summary_metrics_by_cat_standard, split_col=split_col, split_val=split_name)
+        _save_and_close_fig(pdf_pages, fig)
 
         # Histogram and boxplot of predictions by actual class
         split_df = input_df
         fig = gel.plot_histograms(split_df, true_col, pred_col, fig_name)
-        pdf_pages.savefig(fig)
-        plt.close(fig)
+        _save_and_close_fig(pdf_pages, fig)
 
 
     pdf_pages.close()

@@ -336,3 +336,42 @@ def print_threshold_metrics(all_metrics_df, split_col, split_name, check_key="re
 
     # display(metrics_df.iloc[check_rows][display_cols])
     # display("------")
+
+
+def plot_waffle(summary_metrics_by_cat_standard, standard_name="Sensitivity",
+                split_col="Year", split_val="Year 1"):
+    from pywaffle import Waffle
+
+    df = summary_metrics_by_cat_standard.query(f"standard == '{standard_name}'")
+    data_dict = df[df[split_col] == split_val].to_dict(orient="records")[0]
+
+    # icons = ["user-check", "user-slash", "user-slash", "user-check"]
+    # https://matplotlib.org/stable/gallery/color/named_colors.html
+    colors = ["forestgreen", "maroon", "darkorange", "dimgray"]
+    icons = ["user", "user", "user", "user"]
+    values = {
+        "TP": data_dict["TP"],
+        "FN": data_dict["FN"],
+        "FP": data_dict["FP"],
+        "TN": data_dict["TN"],
+    }
+    fig = plt.figure(
+        FigureClass=Waffle,
+        rows=32,
+        columns=32,
+        values=values,
+        colors=colors,
+        icons=icons,
+        font_size=8,
+        starting_location="NW",
+        vertical=True,
+        legend={
+            "loc": "upper left",
+            "bbox_to_anchor": (1, 1),
+            "fontsize": 12,
+        },
+    )
+    plt.title(f"{split_val}, {standard_name} Target Result")
+    plt.tight_layout()
+
+    return fig
