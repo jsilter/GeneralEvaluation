@@ -241,7 +241,7 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
 
         # Re-arrange column order
         custom_column_order = [
-            "standard", split_col, "threshold", "sensitivity", "precision", "specificity",
+            "standard", split_col, "threshold", "sensitivity", "PPV", "specificity",
             "LR+", "N",
         ]
         df = df[custom_column_order]
@@ -291,8 +291,9 @@ def glossary_of_terms():
     Specificity: The proportion of true negative cases that are correctly 
     identified by the model. Also known as "True Negative Rate".
     
-    Precision: The proportion of positive cases identified by the model 
-    that are actually positive. Also known as "Positive Predictive Value".
+    PPV: Positive Predicted Value. 
+    The proportion of positive cases identified by the model 
+    that are actually positive. Also known as "Precision".
     
     AUROC: Area Under the Receiver Operating Characteristic curve.
     A random classifier has an AUROC of 0.5, 

@@ -129,7 +129,7 @@ def plot_roc_prc(curves_by_split, stats_by_split, title_prefix="", all_split_nam
     ax[1].set_xlim([0.0, 1.01])
     ax[1].set_ylim([0.0, 1.01])
     ax[1].set_xlabel('Recall')
-    ax[1].set_ylabel('Precision')
+    ax[1].set_ylabel('Precision (PPV)')
     ax[1].set_title(f'{title_prefix} Precision-Recall Curve')
 
     return fig, ax
@@ -219,7 +219,7 @@ def calc_all_metrics(curves_by_split, split_col="split", all_split_names=None):
 
 def plot_binary_metrics(metrics_df, title_prefix=""):
     x_column = "threshold"
-    joint_columns_to_plot = ["precision", "sensitivity", "specificity"]
+    joint_columns_to_plot = ["PPV", "sensitivity", "specificity"]
     xrange = [0.0, 0.20]
     axis_formatter = ticker.FuncFormatter(lambda x, _: f'{x:.2f}')
     
