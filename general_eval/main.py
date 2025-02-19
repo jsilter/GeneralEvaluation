@@ -242,11 +242,12 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
         # Re-arrange column order
         custom_column_order = [
             "standard", split_col, "threshold", "sensitivity", "PPV", "specificity",
-            "LR+", "N",
+            "LR+", "pred_pos_rate", "N",
         ]
         df = df[custom_column_order]
         custom_column_labels = list(df.columns)
-        cust_mapping = [("f1_score", "F1"), ("balanced_accuracy", "Balanced Acc."), ("sensitivity", "Sensitivity")]
+        cust_mapping = [("f1_score", "F1"), ("balanced_accuracy", "Balanced Acc."), ("sensitivity", "Sensitivity"),
+                        ("pred_pos_rate", "Pred. Pos. Rate")]
         for old, new in cust_mapping:
             if old in custom_column_labels:
                 custom_column_labels[custom_column_labels.index(old)] = new
@@ -271,6 +272,9 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
                 cell.set_text_props(fontweight='bold')
             cell.set_height(row_height)
             cell.set_width(col_width)
+            if len(cell.get_text().get_text()) >= 15:
+                new_fontsize = main_fontsize - 2
+                cell.get_text().set_fontsize(new_fontsize)
 
         ax.add_table(table)
 
@@ -312,7 +316,7 @@ def glossary_of_terms():
 
     return fig
 
-def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85, output_path=None):
+def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85, ppv_target=0.50, output_path=None):
     # Column names
     diagnosis_days_col = DIAGNOSIS_DAYS_COL
     followup_days_col = FOLLOWUP_DAYS_COL
@@ -333,6 +337,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
 
     standards = [
         {"name": f"Sensitivity", "metric": "sensitivity", "direction": "min_diff", "target_value": sensitivity_target},
+        {"name": f"PPV", "metric": "PPV", "direction": "min_diff", "target_value": ppv_target},
         # {"name": "F1", "metric": "f1_score", "direction": "max"},
         # {"name": "Balanced Accuracy", "metric": "balanced_accuracy", "direction": "max"},
     ]

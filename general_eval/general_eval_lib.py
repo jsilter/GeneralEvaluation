@@ -155,12 +155,16 @@ def confusion_matrix_3d(y_true, y_pred, thresholds):
 
 def binary_metrics_by_threshold(y_true, y_pred, thresholds):
     full_conf_matr = confusion_matrix_3d(y_true, y_pred, thresholds)
+    N = np.sum(full_conf_matr[:, :, 0])
     simple_data = {"threshold": thresholds,
                    "TN": full_conf_matr[0, 0, :],
                    "FN": full_conf_matr[1, 0, :],
                    "TP": full_conf_matr[1, 1, :],
-                   "FP": full_conf_matr[0, 1, :]}
-    metrics_df = pd.DataFrame(data=simple_data) 
+                   "FP": full_conf_matr[0, 1, :],
+                   "N": N}
+    metrics_df = pd.DataFrame(data=simple_data)
+
+    metrics_df["pred_pos_rate"] = (metrics_df["TP"] + metrics_df["FP"]) / N
 
     # https://en.wikipedia.org/wiki/Sensitivity_and_specificity#Confusion_matrix
     metrics_df["sensitivity"] = full_conf_matr[1, 1, :] / np.sum(full_conf_matr[1, :, :], axis=0)
@@ -186,18 +190,19 @@ def binary_metrics_by_threshold(y_true, y_pred, thresholds):
 
     metrics_df["balanced_accuracy"] = metrics_df[["recall", "specificity"]].mean(axis=1)
 
-    metrics_df["N"] = np.sum(full_conf_matr[:, :, 0])
+    metrics_df["N"] = N
 
-    # https://pmc.ncbi.nlm.nih.gov/articles/PMC10454914/
-    # Net benefit = (TP / N) - (FP / N)*(P_t)/(1-P_t)
-    _tmp1 = metrics_df["TP"] / metrics_df["N"]
-    _tmp2 = metrics_df["FP"] / metrics_df["N"]
-    _tmp3 = metrics_df["threshold"] / (1.0 - metrics_df["threshold"])
-    metrics_df["net_benefit"] = _tmp1 - (_tmp2*_tmp3)
-    # The null operation of treating all patients, aka consider all patients positive
-    # The "false positives" would therefore be the total number of negatives, which is the sum of TN and FP at each threshold
-    _act_neg_rate = (metrics_df["TN"] + metrics_df["FP"])/metrics_df["N"]
-    metrics_df["_net_benefit_treat_all"] = _tmp1 - (_act_neg_rate*_tmp3)
+    if False:
+        # https://pmc.ncbi.nlm.nih.gov/articles/PMC10454914/
+        # Net benefit = (TP / N) - (FP / N)*(P_t)/(1-P_t)
+        _tmp1 = metrics_df["TP"] / metrics_df["N"]
+        _tmp2 = metrics_df["FP"] / metrics_df["N"]
+        _tmp3 = metrics_df["threshold"] / (1.0 - metrics_df["threshold"])
+        metrics_df["net_benefit"] = _tmp1 - (_tmp2*_tmp3)
+        # The null operation of treating all patients, aka consider all patients positive
+        # The "false positives" would therefore be the total number of negatives, which is the sum of TN and FP at each threshold
+        _act_neg_rate = (metrics_df["TN"] + metrics_df["FP"])/metrics_df["N"]
+        metrics_df["_net_benefit_treat_all"] = _tmp1 - (_act_neg_rate*_tmp3)
 
     return metrics_df
 
@@ -348,7 +353,7 @@ def plot_waffle(summary_metrics_by_cat_standard, standard_name="Sensitivity",
     # icons = ["user-check", "user-slash", "user-slash", "user-check"]
     # https://matplotlib.org/stable/gallery/color/named_colors.html
     colors = ["forestgreen", "maroon", "darkorange", "dimgray"]
-    icons = ["user", "user", "user", "user"]
+    icons = ["circle"]*len(colors)
     values = {
         "TP": data_dict["TP"],
         "FN": data_dict["FN"],
