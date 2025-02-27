@@ -89,6 +89,7 @@ Remove PHI before uploading. If there are missing columns, you will see an error
         mime="text/plain"
     )
 
+    st.write(f"Two tables of thresholds will be generated: a lower threshold for high sensitivity, and a higher threshold for high PPV. The model will be evaluated at these thresholds.")
     sensitivity_target = st.number_input("Sensitivity Target", value=0.85, format="%0.3f", help="The target sensitivity/recall value for the model.")
     ppv_target = st.number_input("PPV Target", value=0.20, format="%0.3f", help="The target PPV/precision value for the model. ")
 
@@ -134,7 +135,7 @@ Remove PHI before uploading. If there are missing columns, you will see an error
             )
 
         # This is a little tricky to get to display right, useful for debugging though
-        displayPDF(pdf_output_file)
+        # displayPDF(pdf_output_file)
 
 
 def streamlit_run():

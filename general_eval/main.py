@@ -106,6 +106,18 @@ def _gen_year_vec(row, diagnosis_days_col, followup_days_col, max_followup=5):
 
     return y_seq, y_mask
 
+def _fmt_values(values, decimals=4):
+    output = []
+    fmt_str = f"%.{decimals}f"
+    for val in values:
+        try:
+            if type(val) == str or val == int(val):
+                output.append(str(val))
+            else:
+                output.append(fmt_str % val)
+        except ValueError:
+            output.append(str(val))
+    return output
 
 def generate_true_columns(input_df, diagnosis_days_col, followup_days_col, true_prefix="true", num_years=5):
 
@@ -169,11 +181,18 @@ def create_basic_stats_table(input_df, diagnosis_days_col):
 
 def create_perf_stats_table(stats_by_cat):
     perf_df = pd.DataFrame(stats_by_cat).T
-    perf_df = perf_df[["auc", "pr_auc", "N"]]
-    perf_df.columns = ["AUROC", "AUPRC", "N"]
-    perf_df = perf_df.round(4)
+    keep_cols = ["auc", "auc_ci", "pr_auc", "N"]
+    perf_df = perf_df[keep_cols]
+    for cc in ["auc", "pr_auc"]:
+        perf_df[cc] = _fmt_values(perf_df[cc].values)
+
+    def _fmt_ci(pair):
+        return f"[{pair[0]:.4f}, {pair[1]:.4f}]"
+    perf_df["auc_ci"] = perf_df["auc_ci"].apply(_fmt_ci)
+
     perf_df["N"] = perf_df["N"].astype(int)
     perf_df = perf_df.reset_index()
+    perf_df.columns = ["Year", "AUROC", "AUC CI (5%-95%)", "AUPRC", "N"]
 
     # Create a figure and axis
     fig, ax = plt.subplots(figsize=(8, 3))  # Adjust the size as needed
@@ -245,6 +264,9 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
             "LR+", "pred_pos_rate", "N",
         ]
         df = df[custom_column_order]
+        numeric_columns = custom_column_order[2:]
+        for cc in numeric_columns:
+            df[cc] = _fmt_values(df[cc].values)
         custom_column_labels = list(df.columns)
         cust_mapping = [("f1_score", "F1"), ("balanced_accuracy", "Balanced Acc."), ("sensitivity", "Sensitivity"),
                         ("pred_pos_rate", "Pred. Pos. Rate")]
@@ -323,7 +345,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
     # num_years = None
     required_columns = [diagnosis_days_col, followup_days_col]
 
-    # Require diagnosis be at least 3 months after exam
+    # Set a minimum number of months between exam and diagnosis?
     min_months = 0
     min_days = int(min_months*30)
     categories = [

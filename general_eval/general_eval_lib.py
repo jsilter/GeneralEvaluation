@@ -49,17 +49,31 @@ def calculate_roc(df, true_col, pred_col):
     stat_dict = {}
     y_true = df[true_col].values
     y_pred = df[pred_col].values
+    N = len(y_true)
 
     fpr, tpr, roc_thresholds = roc_curve(y_true, y_pred)
     curve_dict = {"fpr": fpr, "tpr": tpr, "roc_thresholds": roc_thresholds,
                   "y_true": y_true, "y_pred": y_pred}
-    stat_dict["auc"] = auc(fpr, tpr)
-    stat_dict["N"] = len(y_true)
+    stat_dict["auc"] = float(auc(fpr, tpr))
+
+    n_bootstraps = 30
+    bootstrapped_aucs = []
+    all_inds = np.arange(N)
+    np.random.seed(42)
+    for _ in range(n_bootstraps):
+        boot_inds = np.random.choice(all_inds, N, replace=True)
+        cur_yt, cur_yp = y_true[boot_inds], y_pred[boot_inds]
+        boot_fpr, boot_tpr, _ = roc_curve(cur_yt, cur_yp)
+        bootstrapped_aucs.append(auc(boot_fpr, boot_tpr))
+
+    stat_dict["auc_ci"] = np.percentile(bootstrapped_aucs, [5, 95]).round(4)
 
     # Compute Precision-Recall curve and area
     precision, recall, prc_thresholds = precision_recall_curve(y_true, y_pred)
     curve_dict.update({"precision": precision, "recall": recall, "prc_thresholds": prc_thresholds})
-    stat_dict["pr_auc"] = average_precision_score(y_true, y_pred)
+    stat_dict["pr_auc"] = float(average_precision_score(y_true, y_pred))
+
+    stat_dict["N"] = len(y_true)
 
     return curve_dict, stat_dict
 
