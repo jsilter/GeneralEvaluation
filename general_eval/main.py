@@ -414,7 +414,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
         pred_col = cat["pred_col"]
         cur_df = input_df.query(f"{true_col} >= 0")
 
-        curves_by_cat[name], stats_by_cat[name] = gel.calculate_roc(cur_df, true_col, pred_col)
+        curves_by_cat[name], stats_by_cat[name] = gel.calculate_roc(cur_df[true_col].values, cur_df[pred_col].values)
         all_cat_names.append(name)
 
     all_metrics_df = gel.calc_all_metrics(curves_by_cat, split_col=split_col)
@@ -468,8 +468,10 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
             _save_and_close_fig(pdf_pages, fig)
 
         # Waffle chart showing distribution of positive/negative cases
-        fig = gel.plot_waffle(summary_metrics_by_cat_standard, split_col=split_col, split_val=split_name)
-        _save_and_close_fig(pdf_pages, fig)
+        for standard in standards:
+            fig = gel.plot_waffle(summary_metrics_by_cat_standard, split_col=split_col, split_val=split_name,
+                                  standard_name=standard["name"])
+            _save_and_close_fig(pdf_pages, fig)
 
         # Histogram and boxplot of predictions by actual class
         split_df = input_df

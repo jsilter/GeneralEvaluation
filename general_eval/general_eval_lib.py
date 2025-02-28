@@ -45,10 +45,8 @@ def get_split_names(input_df, split_col, true_col, do_print=True):
 
     return all_split_names
 
-def calculate_roc(df, true_col, pred_col):
+def calculate_roc(y_true, y_pred):
     stat_dict = {}
-    y_true = df[true_col].values
-    y_pred = df[pred_col].values
     N = len(y_true)
 
     fpr, tpr, roc_thresholds = roc_curve(y_true, y_pred)
@@ -110,16 +108,20 @@ def plot_roc_prc(curves_by_split, stats_by_split, title_prefix="", all_split_nam
     fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(14, 6))
     
     # Plot ROC Curves
-    _d = 0.05
+    # _d = 0.05
+    # xoffs = 0.77
+    # yoffs = 0.65
 
-    ax[0].text(0.7, 0.3+_d, s="AUROC: ", transform=ax[0].transAxes)
+    # ax[0].text(xoffs, yoffs+_d, s="AUROC: ", transform=ax[0].transAxes)
+    curve_labels = []
     for si, split_name in enumerate(all_split_names):
         fpr, tpr = curves_by_split[split_name]["fpr"], curves_by_split[split_name]["tpr"]
         ax[0].plot(fpr, tpr, lw=2)
 
         roc_auc = stats_by_split[split_name]["auc"]
-        auroc_str = f'{split_name}: {roc_auc:0.3f}'
-        ax[0].text(0.7, 0.3-_d*si, s=auroc_str, transform=ax[0].transAxes)
+        auroc_str = f'{split_name}: {roc_auc:0.4f}'
+        curve_labels.append(auroc_str)
+        # ax[0].text(xoffs, yoffs-_d*si, s=auroc_str, transform=ax[0].transAxes)
     
     ax[0].plot([0, 1], [0, 1], color='gray', lw=2, linestyle='--', alpha=0.5)
     ax[0].set_xlim([0.0, 1.01])
@@ -127,24 +129,28 @@ def plot_roc_prc(curves_by_split, stats_by_split, title_prefix="", all_split_nam
     ax[0].set_xlabel('False Positive Rate')
     ax[0].set_ylabel('True Positive Rate')
     ax[0].set_title(f'{title_prefix} Receiver Operating Characteristic')
-    
-    
+    ax[0].legend(curve_labels, loc="lower right")
+
     # Plot Precision-Recall Curve
-    xoffs = 0.75
-    ax[1].text(xoffs, 0.7+_d, s="AUPRC: ", transform=ax[1].transAxes)
+    # xoffs = 0.77
+    # yoffs = 0.90
+    # ax[1].text(xoffs, yoffs+_d, s="AUPRC: ", transform=ax[1].transAxes)
+    curve_labels = []
     for si, split_name in enumerate(all_split_names):
         recall, prec = curves_by_split[split_name]["recall"], curves_by_split[split_name]["precision"]
         ax[1].plot(recall, prec, lw=2)
 
         pr_auc = stats_by_split[split_name]["pr_auc"]
-        auprc_str = f'{split_name}: {pr_auc:0.3f}'
-        ax[1].text(xoffs, 0.7-_d*si, s=auprc_str, transform=ax[1].transAxes)
+        auprc_str = f'{split_name}: {pr_auc:0.4f}'
+        curve_labels.append(auprc_str)
+        # ax[1].text(xoffs, yoffs-_d*si, s=auprc_str, transform=ax[1].transAxes)
         
     ax[1].set_xlim([0.0, 1.01])
     ax[1].set_ylim([0.0, 1.01])
     ax[1].set_xlabel('Recall')
     ax[1].set_ylabel('Precision (PPV)')
     ax[1].set_title(f'{title_prefix} Precision-Recall Curve')
+    ax[1].legend(curve_labels, loc="upper right")
 
     return fig, ax
 
