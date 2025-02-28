@@ -45,7 +45,26 @@ def get_split_names(input_df, split_col, true_col, do_print=True):
 
     return all_split_names
 
-def calculate_roc(y_true, y_pred):
+def metrics_by_category(input_df, categories, split_col, n_bootstraps=0):
+    """Calculate ROC curves and binary metrics, separated by category (ie year)"""
+    curves_by_cat = {}
+    stats_by_cat = {}
+    all_cat_names = []
+    for cat in categories:
+        name = cat["name"]
+        true_col = cat["true_col"]
+        pred_col = cat["pred_col"]
+        cur_df = input_df.query(f"{true_col} >= 0")
+
+        curves_by_cat[name], stats_by_cat[name] = calculate_roc(cur_df[true_col].values, cur_df[pred_col].values,
+                                                                n_bootstraps=n_bootstraps)
+        all_cat_names.append(name)
+
+    all_metrics_df = calc_all_metrics(curves_by_cat, split_col=split_col, n_bootstraps=n_bootstraps)
+
+    return curves_by_cat, stats_by_cat, all_metrics_df
+
+def calculate_roc(y_true, y_pred, n_bootstraps=0):
     stat_dict = {}
     N = len(y_true)
 
@@ -54,17 +73,18 @@ def calculate_roc(y_true, y_pred):
                   "y_true": y_true, "y_pred": y_pred}
     stat_dict["auc"] = float(auc(fpr, tpr))
 
-    n_bootstraps = 30
-    bootstrapped_aucs = []
-    all_inds = np.arange(N)
-    np.random.seed(42)
-    for _ in range(n_bootstraps):
-        boot_inds = np.random.choice(all_inds, N, replace=True)
-        cur_yt, cur_yp = y_true[boot_inds], y_pred[boot_inds]
-        boot_fpr, boot_tpr, _ = roc_curve(cur_yt, cur_yp)
-        bootstrapped_aucs.append(auc(boot_fpr, boot_tpr))
 
-    stat_dict["auc_ci"] = np.percentile(bootstrapped_aucs, [5, 95]).round(4)
+    if n_bootstraps > 0:
+        bootstrapped_aucs = []
+        all_inds = np.arange(N)
+        np.random.seed(42)
+        for _ in range(n_bootstraps):
+            boot_inds = np.random.choice(all_inds, N, replace=True)
+            cur_yt, cur_yp = y_true[boot_inds], y_pred[boot_inds]
+            boot_fpr, boot_tpr, _ = roc_curve(cur_yt, cur_yp)
+            bootstrapped_aucs.append(auc(boot_fpr, boot_tpr))
+
+        stat_dict["auc_ci"] = np.percentile(bootstrapped_aucs, [5, 95]).round(4)
 
     # Compute Precision-Recall curve and area
     precision, recall, prc_thresholds = precision_recall_curve(y_true, y_pred)
@@ -226,18 +246,28 @@ def binary_metrics_by_threshold(y_true, y_pred, thresholds):
 
     return metrics_df
 
-def calc_all_metrics(curves_by_split, split_col="split", all_split_names=None):
+def calc_all_metrics(curves_by_split, split_col="split", all_split_names=None, n_bootstraps=0):
     if all_split_names is None:
         all_split_names = list(curves_by_split.keys())
-    
+
     metrics_list = []
-    for split_name in all_split_names:
-        cur_curves = curves_by_split[split_name]
-        prc_thresholds = cur_curves["prc_thresholds"]
-        y_true, y_pred = cur_curves["y_true"], cur_curves["y_pred"]
-        metrics_df = binary_metrics_by_threshold(y_true, y_pred, prc_thresholds)
-        metrics_df[split_col] = split_name
-        metrics_list.append(metrics_df)
+    np.random.seed(42)
+    for bi in range(n_bootstraps + 1):
+        for split_name in all_split_names:
+            cur_curves = curves_by_split[split_name]
+            # Note that we use the same thresholds for each bootstrap.
+            # We're simulating generalization error, not model uncertainty.
+            prc_thresholds = cur_curves["prc_thresholds"]
+            y_true, y_pred = cur_curves["y_true"], cur_curves["y_pred"]
+            if bi >= 1:
+                N = len(y_true)
+                cur_bi_inds = np.random.choice(np.arange(N), N, replace=True)
+                y_true, y_pred = y_true[cur_bi_inds], y_pred[cur_bi_inds]
+
+            metrics_df = binary_metrics_by_threshold(y_true, y_pred, prc_thresholds)
+            metrics_df[split_col] = split_name
+            metrics_df["bootstrap_index"] = bi
+            metrics_list.append(metrics_df)
     
     all_metrics_df = pd.concat(metrics_list)
     return all_metrics_df
@@ -361,7 +391,6 @@ def print_threshold_metrics(all_metrics_df, split_col, split_name, check_key="re
 
     # display(metrics_df.iloc[check_rows][display_cols])
     # display("------")
-
 
 def plot_waffle(summary_metrics_by_cat_standard, standard_name="Sensitivity",
                 split_col="Year", split_val="Year 1"):

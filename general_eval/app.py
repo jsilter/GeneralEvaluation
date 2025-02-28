@@ -93,6 +93,10 @@ Remove PHI before uploading. If there are missing columns, you will see an error
     sensitivity_target = st.number_input("Sensitivity Target", value=0.85, format="%0.3f", help="The target sensitivity/recall value for the model.")
     ppv_target = st.number_input("PPV Target", value=0.20, format="%0.3f", help="The target PPV/precision value for the model. ")
 
+    n_bootstraps = st.number_input("Number of Bootstraps", value=0,
+                                   help="Number of bootstrap iterations to use for confidence intervals. "
+                                        "Note that this will increase the runtime of the evaluation.")
+
     run_button = st.button("Run Evaluation", disabled=uploaded_file is None)
 
     if run_button and uploaded_file is not None:
@@ -104,7 +108,8 @@ Remove PHI before uploading. If there are missing columns, you will see an error
                 temp_file_path = temp_file.name
                 pdf_output_file, all_metrics_df = run_full_eval(ds_name, temp_file_path,
                                                                 sensitivity_target=sensitivity_target,
-                                                                ppv_target=ppv_target)
+                                                                ppv_target=ppv_target,
+                                                                n_bootstraps=n_bootstraps)
 
             st.success("Evaluation complete!")
             st.session_state.analysis_done = True
@@ -135,7 +140,7 @@ Remove PHI before uploading. If there are missing columns, you will see an error
             )
 
         # This is a little tricky to get to display right, useful for debugging though
-        # displayPDF(pdf_output_file)
+        displayPDF(pdf_output_file)
 
 
 def streamlit_run():

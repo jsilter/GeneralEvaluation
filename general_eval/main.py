@@ -119,6 +119,10 @@ def _fmt_values(values, decimals=4):
             output.append(str(val))
     return output
 
+def _fmt_ci(pair, decimals=4):
+    fmt_str = f"%.{decimals}f"
+    return "[" + fmt_str%pair[0] + ", " + fmt_str%pair[1] + "]"
+
 def generate_true_columns(input_df, diagnosis_days_col, followup_days_col, true_prefix="true", num_years=5):
 
     input_df["__interval_months"] = input_df[diagnosis_days_col].apply(_days_to_months)
@@ -181,18 +185,23 @@ def create_basic_stats_table(input_df, diagnosis_days_col):
 
 def create_perf_stats_table(stats_by_cat):
     perf_df = pd.DataFrame(stats_by_cat).T
-    keep_cols = ["auc", "auc_ci", "pr_auc", "N"]
-    perf_df = perf_df[keep_cols]
+    has_ci = "auc_ci" in perf_df.columns
+    keep_cols = ["auc", "pr_auc", "N"]
+    if has_ci:
+        keep_cols.insert(1, "auc_ci")
+        perf_df["auc_ci"] = perf_df["auc_ci"].apply(_fmt_ci)
+
     for cc in ["auc", "pr_auc"]:
         perf_df[cc] = _fmt_values(perf_df[cc].values)
 
-    def _fmt_ci(pair):
-        return f"[{pair[0]:.4f}, {pair[1]:.4f}]"
-    perf_df["auc_ci"] = perf_df["auc_ci"].apply(_fmt_ci)
-
     perf_df["N"] = perf_df["N"].astype(int)
+    perf_df = perf_df[keep_cols]
+
     perf_df = perf_df.reset_index()
-    perf_df.columns = ["Year", "AUROC", "AUC CI (5%-95%)", "AUPRC", "N"]
+    column_labels = ["Year", "AUROC", "AUPRC", "N"]
+    if has_ci:
+        column_labels.insert(2, "AUC CI (5%-95%)")
+    perf_df.columns = column_labels
 
     # Create a figure and axis
     fig, ax = plt.subplots(figsize=(8, 3))  # Adjust the size as needed
@@ -221,13 +230,13 @@ def generate_standards_df(all_metrics_df, standards, categories, split_col):
     # Print out table of thresholds and stats
 
     summary_metrics_by_cat_standard = []
+    all_standard_metrics = set([ss["metric"] for ss in standards])
     for standard in standards:
-        # print(f"Thresholds for {standard['name']}")
         for cat in categories:
             split_name = cat["name"]
-            true_col = cat["true_col"]
-            pred_col = cat["pred_col"]
             split_df = all_metrics_df.query(f"{split_col} == '{split_name}'").copy()
+            if "bootstrap_index" in all_metrics_df.columns:
+                split_df = split_df.query("bootstrap_index == 0").copy()
 
             if standard["direction"] == "min_diff":
                 split_df["diff"] = np.abs(split_df[standard["metric"]] - standard["target_value"])
@@ -236,6 +245,19 @@ def generate_standards_df(all_metrics_df, standards, categories, split_col):
             else:
                 split_df = split_df.sort_values(standard["metric"], ascending=standard["direction"] == "min")
                 best_row = split_df.iloc[0].copy()
+
+            if "bootstrap_index" in all_metrics_df.columns:
+                num_bootstraps = len(all_metrics_df["bootstrap_index"].unique())
+
+                if num_bootstraps >= 2:
+                    bootstrapped_df = all_metrics_df.query(f"{split_col} == '{split_name}'") \
+                                                    .query("threshold == @best_row['threshold']")
+
+                    for metric in all_standard_metrics:
+                        bootstrapped_vals = bootstrapped_df[metric].values
+                        bootstrapped_ci = np.percentile(bootstrapped_vals, [5, 95])
+                        col_label = f"{metric}_ci"
+                        best_row[col_label] = _fmt_ci(bootstrapped_ci, decimals=3)
 
             best_row["standard"] = standard["name"]
             summary_metrics_by_cat_standard.append(best_row)
@@ -260,21 +282,34 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
 
         # Re-arrange column order
         custom_column_order = [
-            "standard", split_col, "threshold", "sensitivity", "PPV", "specificity",
+            "standard", split_col, "threshold", "sensitivity", "sensitivity_ci", "PPV", "PPV_ci", "specificity",
             "LR+", "pred_pos_rate", "N",
         ]
+        custom_column_order = [cc for cc in custom_column_order if cc in df.columns]
+
         df = df[custom_column_order]
         numeric_columns = custom_column_order[2:]
         for cc in numeric_columns:
             df[cc] = _fmt_values(df[cc].values)
         custom_column_labels = list(df.columns)
-        cust_mapping = [("f1_score", "F1"), ("balanced_accuracy", "Balanced Acc."), ("sensitivity", "Sensitivity"),
-                        ("pred_pos_rate", "Pred. Pos. Rate")]
+        cust_mapping = [("f1_score", "F1"), ("balanced_accuracy", "Balanced Acc."),
+                        ("pred_pos_rate", "Pred. Pos. Rate"),
+                        ("sensitivity", "Sensitivity"), ("sensitivity_ci", "Sensitivity CI"), ("PPV_ci", "PPV CI"),]
+        new_cols = []
         for old, new in cust_mapping:
             if old in custom_column_labels:
                 custom_column_labels[custom_column_labels.index(old)] = new
-        # Capitalize column names
-        custom_column_labels = [col.capitalize() if len(col) >= 4 else col.upper() for col in custom_column_labels]
+                new_cols.append(new)
+
+        def _fmt_col_name(colname):
+            if colname in new_cols:
+                return colname
+            elif len(colname) >= 4:
+                return colname.capitalize()
+            else:
+                return colname.upper()
+
+        custom_column_labels = list(map(_fmt_col_name, custom_column_labels))
 
         table = plt.table(
             cellText=df.values,
@@ -294,9 +329,13 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
                 cell.set_text_props(fontweight='bold')
             cell.set_height(row_height)
             cell.set_width(col_width)
-            if len(cell.get_text().get_text()) >= 15:
+            num_chars = len(cell.get_text().get_text())
+            new_fontsize = main_fontsize
+            if num_chars >= 12:
+                new_fontsize = main_fontsize - 4
+            elif num_chars >= 8:
                 new_fontsize = main_fontsize - 2
-                cell.get_text().set_fontsize(new_fontsize)
+            cell.get_text().set_fontsize(new_fontsize)
 
         ax.add_table(table)
 
@@ -338,12 +377,14 @@ def glossary_of_terms():
 
     return fig
 
-def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85, ppv_target=0.50, output_path=None):
+def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85, ppv_target=0.50, output_path=None, n_bootstraps=0):
     # Column names
     diagnosis_days_col = DIAGNOSIS_DAYS_COL
     followup_days_col = FOLLOWUP_DAYS_COL
     # num_years = None
     required_columns = [diagnosis_days_col, followup_days_col]
+
+    # n_bootstraps = 10
 
     # Set a minimum number of months between exam and diagnosis?
     min_months = 0
@@ -401,23 +442,14 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
 
     if min_months is not None:
         keep_rows = input_df.apply(_keep_row, axis=1)
-        # print(f"Keeping {keep_rows.sum()} / {len(keep_rows)} rows with valid exam/diagnosis dates")
         input_df = input_df.loc[keep_rows, :]
 
-    # Calculate ROC curves and binary metrics, separated by category (ie year)
-    curves_by_cat = {}
-    stats_by_cat = {}
-    all_cat_names = []
-    for cat in categories:
-        name = cat["name"]
-        true_col = cat["true_col"]
-        pred_col = cat["pred_col"]
-        cur_df = input_df.query(f"{true_col} >= 0")
-
-        curves_by_cat[name], stats_by_cat[name] = gel.calculate_roc(cur_df[true_col].values, cur_df[pred_col].values)
-        all_cat_names.append(name)
-
-    all_metrics_df = gel.calc_all_metrics(curves_by_cat, split_col=split_col)
+    ### Calculate ROC curves and binary metrics, separated by category (ie year)
+    ###
+    curves_by_cat, stats_by_cat, all_metrics_df = gel.metrics_by_category(input_df, categories, split_col=split_col,
+                                                                          n_bootstraps=n_bootstraps)
+    ###
+    ###
 
     # ------------ Plotting ------------ #
     sns.set_theme(style="darkgrid")
@@ -461,6 +493,8 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
         metrics_df = all_metrics_df
         if split_col is not None:
             metrics_df = all_metrics_df[all_metrics_df[split_col] == split_name]
+        if "bootstrap_index" in all_metrics_df.columns:
+            metrics_df = metrics_df.query("bootstrap_index == 0")
 
         figures = gel.plot_binary_metrics(metrics_df, fig_name)
 
