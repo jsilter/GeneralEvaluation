@@ -139,7 +139,7 @@ def plot_roc_prc(curves_by_split, stats_by_split, title_prefix="", all_split_nam
         ax[0].plot(fpr, tpr, lw=2)
 
         roc_auc = stats_by_split[split_name]["auc"]
-        auroc_str = f'{split_name}: {roc_auc:0.4f}'
+        auroc_str = f'{split_name}: {roc_auc:.1%}'
         curve_labels.append(auroc_str)
         # ax[0].text(xoffs, yoffs-_d*si, s=auroc_str, transform=ax[0].transAxes)
     
@@ -161,7 +161,7 @@ def plot_roc_prc(curves_by_split, stats_by_split, title_prefix="", all_split_nam
         ax[1].plot(recall, prec, lw=2)
 
         pr_auc = stats_by_split[split_name]["pr_auc"]
-        auprc_str = f'{split_name}: {pr_auc:0.4f}'
+        auprc_str = f'{split_name}: {pr_auc:.1%}'
         curve_labels.append(auprc_str)
         # ax[1].text(xoffs, yoffs-_d*si, s=auprc_str, transform=ax[1].transAxes)
         
@@ -276,7 +276,7 @@ def plot_binary_metrics(metrics_df, title_prefix=""):
     x_column = "threshold"
     joint_columns_to_plot = ["PPV", "sensitivity", "specificity"]
     xrange = [0.0, 0.20]
-    axis_formatter = ticker.FuncFormatter(lambda x, _: f'{x:.2f}')
+    axis_formatter = ticker.FuncFormatter(lambda x, _: f'{x:.1%}')
     
     def pretty_str(instr):
         tmp = instr.replace("_", " ")
@@ -327,13 +327,17 @@ def plot_binary_metrics(metrics_df, title_prefix=""):
 
 def plot_histograms(input_df, true_col, pred_col, title_prefix=""):
     plot_df = input_df.copy()
-    plot_df[true_col] = plot_df[true_col].map({0: "Negative", 1: "Positive"})
+    true_value_counts_ = plot_df[true_col].value_counts()
+    nneg = true_value_counts_[0]
+    npos = true_value_counts_[1]
+    plot_df[true_col] = plot_df[true_col].map(
+        {0: f"Negative ({nneg})", 1: f"Positive ({npos})"})
 
     fig, (ax0, ax1) = plt.subplots(nrows=1, ncols=2, figsize=(14, 6), 
                                   gridspec_kw={'wspace': 0.3})
     
     ax = sns.kdeplot(plot_df, ax=ax0, x=pred_col, hue=true_col, 
-                linewidth=0.5, bw_adjust=0.5,
+                linewidth=0.5, bw_adjust=1.0,
                 fill=True, common_norm=False, cumulative=False)
     _ = ax.set_xlim([0.0, 1.0])
     _ = ax.set_ylim([0.0, 5.0])

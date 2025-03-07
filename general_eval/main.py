@@ -106,22 +106,24 @@ def _gen_year_vec(row, diagnosis_days_col, followup_days_col, max_followup=5):
 
     return y_seq, y_mask
 
-def _fmt_values(values, decimals=4):
+def _fmt_values(values, decimals=1):
     output = []
-    fmt_str = f"%.{decimals}f"
+    fmt_str = f"{{:.{decimals}%}}"
     for val in values:
         try:
             if type(val) == str or val == int(val):
                 output.append(str(val))
+            elif float(val) < 1.:
+                output.append(fmt_str.format(val))
             else:
-                output.append(fmt_str % val)
+                output.append(f"{val:.{decimals}f}")
         except ValueError:
             output.append(str(val))
     return output
 
-def _fmt_ci(pair, decimals=4):
-    fmt_str = f"%.{decimals}f"
-    return "[" + fmt_str%pair[0] + ", " + fmt_str%pair[1] + "]"
+def _fmt_ci(pair, decimals=1):
+    fmt_str = f"{{:.{decimals}%}}"
+    return "[" + fmt_str.format(pair[0]) + ", " + fmt_str.format(pair[1]) + "]"
 
 def generate_true_columns(input_df, diagnosis_days_col, followup_days_col, true_prefix="true", num_years=5):
 
@@ -257,7 +259,7 @@ def generate_standards_df(all_metrics_df, standards, categories, split_col):
                         bootstrapped_vals = bootstrapped_df[metric].values
                         bootstrapped_ci = np.percentile(bootstrapped_vals, [5, 95])
                         col_label = f"{metric}_ci"
-                        best_row[col_label] = _fmt_ci(bootstrapped_ci, decimals=3)
+                        best_row[col_label] = _fmt_ci(bootstrapped_ci)
 
             best_row["standard"] = standard["name"]
             summary_metrics_by_cat_standard.append(best_row)
@@ -327,6 +329,8 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
         for key, cell in table.get_celld().items():
             if key[0] == 0:
                 cell.set_text_props(fontweight='bold')
+
+            # cell.set_text_props(ha='right')
             cell.set_height(row_height)
             cell.set_width(col_width)
             num_chars = len(cell.get_text().get_text())
@@ -377,7 +381,7 @@ def glossary_of_terms():
 
     return fig
 
-def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85, ppv_target=0.50, output_path=None, n_bootstraps=0):
+def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85, ppv_target=0.20, output_path=None, n_bootstraps=0):
     # Column names
     diagnosis_days_col = DIAGNOSIS_DAYS_COL
     followup_days_col = FOLLOWUP_DAYS_COL
