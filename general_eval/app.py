@@ -90,8 +90,12 @@ Remove PHI before uploading. If there are missing columns, you will see an error
     )
 
     st.write(f"Two tables of thresholds will be generated: a lower threshold for high sensitivity, and a higher threshold for high PPV. The model will be evaluated at these thresholds.")
-    sensitivity_target = st.number_input("Sensitivity Target", value=0.85, format="%0.3f", help="The target sensitivity/recall value for the model.")
-    ppv_target = st.number_input("PPV Target", value=0.20, format="%0.3f", help="The target PPV/precision value for the model. ")
+    sensitivity_target = st.number_input("Sensitivity Target (%)", value=85., format="%4.1f",
+                                         help="The target sensitivity/recall value for the model.",
+                                         step=1.0)
+    ppv_target = st.number_input("PPV Target (%)", value=20., format="%4.1f",
+                                 help="The target PPV/precision value for the model. ",
+                                 step=1.0)
 
     n_bootstraps = st.number_input("Number of Bootstraps", value=0,
                                    help="Number of bootstrap iterations to use for confidence intervals. "
@@ -107,8 +111,8 @@ Remove PHI before uploading. If there are missing columns, you will see an error
                 temp_file.write(uploaded_file.getvalue())
                 temp_file_path = temp_file.name
                 pdf_output_file, all_metrics_df = run_full_eval(ds_name, temp_file_path,
-                                                                sensitivity_target=sensitivity_target,
-                                                                ppv_target=ppv_target,
+                                                                sensitivity_target=sensitivity_target / 100.,
+                                                                ppv_target=ppv_target / 100.,
                                                                 n_bootstraps=n_bootstraps)
 
             st.success("Evaluation complete!")
