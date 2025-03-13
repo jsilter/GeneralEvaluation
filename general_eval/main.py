@@ -106,15 +106,15 @@ def _gen_year_vec(row, diagnosis_days_col, followup_days_col, max_followup=5):
 
     return y_seq, y_mask
 
-def _fmt_values(values, decimals=1):
+def _fmt_values(values, decimals=1, force_no_perc=False):
     output = []
-    fmt_str = f"{{:.{decimals}%}}"
+    perc_fmt_str = f"{{:.{decimals}%}}"
     for val in values:
         try:
-            if type(val) == str or val == int(val):
+            if type(val) == str or type(val) == int:
                 output.append(str(val))
-            elif float(val) < 1.:
-                output.append(fmt_str.format(val))
+            elif float(val) <= 1. and not force_no_perc:
+                output.append(perc_fmt_str.format(val))
             else:
                 output.append(f"{val:.{decimals}f}")
         except ValueError:
@@ -124,6 +124,19 @@ def _fmt_values(values, decimals=1):
 def _fmt_ci(pair, decimals=1):
     fmt_str = f"{{:.{decimals}%}}"
     return "[" + fmt_str.format(pair[0]) + ", " + fmt_str.format(pair[1]) + "]"
+
+def _coerce_val_to_int(val):
+    if val is None:
+        return -1
+    elif str(val).lower() in {"-1", "-1.0", "nan", "nat", "", "none"}:
+        return -1
+    elif pd.isna(val):
+        return -1
+    else:
+        return int(val)
+
+def _coerce_series_to_int(series):
+    return series.apply(_coerce_val_to_int)
 
 def generate_true_columns(input_df, diagnosis_days_col, followup_days_col, true_prefix="true", num_years=5):
 
@@ -288,11 +301,14 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
             "LR+", "pred_pos_rate", "N",
         ]
         custom_column_order = [cc for cc in custom_column_order if cc in df.columns]
+        fmt_kwargs = {"LR+": {"decimals": 2, "force_no_perc": True},
+                      "N": {"decimals": 0, "force_no_perc": True},}
 
         df = df[custom_column_order]
         numeric_columns = custom_column_order[2:]
         for cc in numeric_columns:
-            df[cc] = _fmt_values(df[cc].values)
+            kwargs_ = fmt_kwargs.get(cc, {})
+            df[cc] = _fmt_values(df[cc].values, **kwargs_)
         custom_column_labels = list(df.columns)
         cust_mapping = [("f1_score", "F1"), ("balanced_accuracy", "Balanced Acc."),
                         ("pred_pos_rate", "Pred. Pos. Rate"),
@@ -386,7 +402,8 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
     diagnosis_days_col = DIAGNOSIS_DAYS_COL
     followup_days_col = FOLLOWUP_DAYS_COL
     # num_years = None
-    required_columns = [diagnosis_days_col, followup_days_col]
+    outcome_cols = [diagnosis_days_col, followup_days_col]
+    required_columns = outcome_cols
 
     # n_bootstraps = 10
 
@@ -425,7 +442,8 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
     num_years = len(keep_categories)
     categories = keep_categories
 
-    numeric_cols = [diagnosis_days_col, followup_days_col] + [cat["pred_col"] for cat in categories]
+    numeric_cols = outcome_cols + [cat["pred_col"] for cat in categories]
+    input_df[outcome_cols] = input_df[outcome_cols].apply(_coerce_series_to_int)
     input_df[numeric_cols] = input_df[numeric_cols].apply(pd.to_numeric, errors='coerce')
 
     for rc in required_columns:
