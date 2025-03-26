@@ -12,6 +12,7 @@ import sklearn
 import seaborn as sns
 
 from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score, confusion_matrix
+from sklearn.calibration import CalibrationDisplay
 
 def load_input_df(name, content, **kwargs):
     if name.endswith(".csv"):
@@ -431,5 +432,31 @@ def plot_waffle(summary_metrics_by_cat_standard, standard_name="Sensitivity",
     )
     plt.title(f"{split_val}, {standard_name} Target Result")
     plt.tight_layout()
+
+    return fig
+
+
+def plot_calibration_curve(input_df, true_col, pred_col, fig_name):
+    plot_df = input_df.copy()
+    y_true = plot_df[true_col].values
+    y_pred = plot_df[pred_col].values
+
+    xrange = [0.0, 0.20]
+    axis_formatter = ticker.FuncFormatter(lambda x, _: f'{x:.1%}')
+    n_bins = 10
+    strategy = "quantile"
+
+    fig = plt.figure()
+    ax = plt.gca()
+    disp = CalibrationDisplay.from_predictions(y_true, y_pred, name=fig_name, ax=ax,
+                                               n_bins=n_bins, strategy=strategy)
+    _ = ax.set_xlim(*xrange)
+    _ = ax.set_ylim(*xrange)
+    _ = ax.xaxis.set_major_formatter(axis_formatter)
+    _ = ax.yaxis.set_major_formatter(axis_formatter)
+
+    _ = ax.set_xlabel("Mean predicted probability")
+    _ = ax.set_ylabel("Fraction of positives")
+    _ = ax.set_title(f"{fig_name} Calibration Curve")
 
     return fig

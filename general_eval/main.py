@@ -511,6 +511,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
         true_col = cat["true_col"]
         pred_col = cat["pred_col"]
         fig_name = f"{split_name}"
+        split_df = input_df.query(f"{true_col} >= 0")
 
         metrics_df = all_metrics_df
         if split_col is not None:
@@ -518,6 +519,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
         if "bootstrap_index" in all_metrics_df.columns:
             metrics_df = metrics_df.query("bootstrap_index == 0")
 
+        ### FIGURE
         figures = gel.plot_binary_metrics(metrics_df, fig_name)
 
         for fig in figures:
@@ -529,9 +531,14 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
                                   standard_name=standard["name"])
             _save_and_close_fig(pdf_pages, fig)
 
+        ### FIGURE
         # Histogram and boxplot of predictions by actual class
-        split_df = input_df
         fig = gel.plot_histograms(split_df, true_col, pred_col, fig_name)
+        _save_and_close_fig(pdf_pages, fig)
+
+        ### FIGURE
+        # Calibration plot
+        fig = gel.plot_calibration_curve(split_df, true_col, pred_col, fig_name)
         _save_and_close_fig(pdf_pages, fig)
 
 
