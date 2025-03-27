@@ -11,7 +11,8 @@ import pandas as pd
 import sklearn
 import seaborn as sns
 
-from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score, confusion_matrix
+from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score, confusion_matrix, \
+    roc_auc_score
 from sklearn.calibration import CalibrationDisplay
 
 def load_input_df(name, content, **kwargs):
@@ -46,81 +47,69 @@ def get_split_names(input_df, split_col, true_col, do_print=True):
 
     return all_split_names
 
-def metrics_by_category(input_df, categories, split_col, n_bootstraps=0):
+def metrics_by_category(input_df, categories, split_col, n_bootstraps=0, progress_bar=None):
     """Calculate ROC curves and binary metrics, separated by category (ie year)"""
     curves_by_cat = {}
     stats_by_cat = {}
-    all_cat_names = []
-    for cat in categories:
+    metrics_list = []
+    num_cats = len(categories)
+    total_bis = (n_bootstraps + 1) * num_cats
+    for ii, cat in enumerate(categories):
         name = cat["name"]
         true_col = cat["true_col"]
         pred_col = cat["pred_col"]
         cur_df = input_df.query(f"{true_col} >= 0")
 
-        curves_by_cat[name], stats_by_cat[name] = calculate_roc(cur_df[true_col].values, cur_df[pred_col].values,
-                                                                n_bootstraps=n_bootstraps)
-        all_cat_names.append(name)
+        cur_stats, cur_curves = calculate_auc_stats_curves(cur_df[true_col].values, cur_df[pred_col].values)
 
-    all_metrics_df = calc_all_metrics(curves_by_cat, split_col=split_col, n_bootstraps=n_bootstraps)
+        bootstrapped_aucs = []
+        np.random.seed(42)
+        for bi in range(n_bootstraps + 1):
+            if progress_bar:
+                progress_bar.progress((ii*n_bootstraps + bi) / total_bis, f"Processing {name} Bootstrap {bi}")
+            # Note that we use the same thresholds for each bootstrap.
+            # We're simulating generalization error, not model uncertainty.
+            prc_thresholds = cur_curves["prc_thresholds"]
+            y_true, y_pred = cur_curves["y_true"], cur_curves["y_pred"]
+            if bi >= 1:
+                N = len(y_true)
+                cur_bi_inds = np.random.choice(np.arange(N), N, replace=True)
+                y_true, y_pred = y_true[cur_bi_inds], y_pred[cur_bi_inds]
 
+            metrics_df = binary_metrics_by_threshold(y_true, y_pred, prc_thresholds)
+            metrics_df["bootstrap_index"] = bi
+            metrics_df[split_col] = name
+
+            metrics_list.append(metrics_df)
+
+            bi_cur_stats, bi_cur_curves = calculate_auc_stats_curves(y_true, y_pred, calculate_curves=False)
+            bootstrapped_aucs.append(bi_cur_stats["auc"])
+
+        cur_stats["auc_ci"] = np.percentile(bootstrapped_aucs, [5, 95]).round(4)
+
+        curves_by_cat[name] = cur_curves
+        stats_by_cat[name] = cur_stats
+
+    all_metrics_df = pd.concat(metrics_list)
     return curves_by_cat, stats_by_cat, all_metrics_df
 
-def calculate_roc(y_true, y_pred, n_bootstraps=0):
+def calculate_auc_stats_curves(y_true, y_pred, calculate_curves=True):
     stat_dict = {}
-    N = len(y_true)
-
-    fpr, tpr, roc_thresholds = roc_curve(y_true, y_pred)
-    curve_dict = {"fpr": fpr, "tpr": tpr, "roc_thresholds": roc_thresholds,
-                  "y_true": y_true, "y_pred": y_pred}
-    stat_dict["auc"] = float(auc(fpr, tpr))
-
-
-    if n_bootstraps > 0:
-        bootstrapped_aucs = []
-        all_inds = np.arange(N)
-        np.random.seed(42)
-        for _ in range(n_bootstraps):
-            boot_inds = np.random.choice(all_inds, N, replace=True)
-            cur_yt, cur_yp = y_true[boot_inds], y_pred[boot_inds]
-            boot_fpr, boot_tpr, _ = roc_curve(cur_yt, cur_yp)
-            bootstrapped_aucs.append(auc(boot_fpr, boot_tpr))
-
-        stat_dict["auc_ci"] = np.percentile(bootstrapped_aucs, [5, 95]).round(4)
-
-    # Compute Precision-Recall curve and area
-    precision, recall, prc_thresholds = precision_recall_curve(y_true, y_pred)
-    curve_dict.update({"precision": precision, "recall": recall, "prc_thresholds": prc_thresholds})
+    stat_dict["auc"] = float(roc_auc_score(y_true, y_pred))
     stat_dict["pr_auc"] = float(average_precision_score(y_true, y_pred))
+    # stat_dict["auc_ci"] = np.percentile(bootstrapped_aucs, [5, 95]).round(4)
 
-    stat_dict["N"] = len(y_true)
-
-    return curve_dict, stat_dict
-
-def calculate_roc_by_split(input_df, true_col, pred_col, split_col):
-    curves_by_split = {}
-    stats_by_split = {}
-    
-    for split_name, split_df in input_df.groupby(split_col):
-        curve_dict = {}
-        stat_dict = {}
-        y_true = split_df[true_col].values
-        y_pred = split_df[pred_col].values
-        
+    curve_dict = {}
+    if calculate_curves:
         fpr, tpr, roc_thresholds = roc_curve(y_true, y_pred)
-        curve_dict = {"fpr": fpr, "tpr": tpr, "roc_thresholds": roc_thresholds,
-                      "y_true": y_true, "y_pred": y_pred}
-        stat_dict["auc"] = auc(fpr, tpr)
-        stat_dict["N"] = len(y_true)
-        
         # Compute Precision-Recall curve and area
         precision, recall, prc_thresholds = precision_recall_curve(y_true, y_pred)
+        curve_dict = {"fpr": fpr, "tpr": tpr, "roc_thresholds": roc_thresholds,
+                      "y_true": y_true, "y_pred": y_pred}
         curve_dict.update({"precision": precision, "recall": recall, "prc_thresholds": prc_thresholds})
-        stat_dict["pr_auc"] = average_precision_score(y_true, y_pred)
-        
-        curves_by_split[split_name] = curve_dict
-        stats_by_split[split_name] = stat_dict
 
-    return curves_by_split, stats_by_split
+    stat_dict["N"] = len(y_true)
+    return stat_dict, curve_dict
 
 def plot_roc_prc(curves_by_split, stats_by_split, title_prefix="", all_split_names=None):
     if all_split_names is None:

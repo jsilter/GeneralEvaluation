@@ -468,16 +468,15 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
     ### Calculate ROC curves and binary metrics, separated by category (ie year)
     ###
     curves_by_cat, stats_by_cat, all_metrics_df = gel.metrics_by_category(input_df, categories,
-                                                                          split_col=split_col,
-                                                                          n_bootstraps=n_bootstraps,
-                                                                          progress_bar=progress_bar)
+                                                    split_col=split_col, n_bootstraps=n_bootstraps,
+                                                    progress_bar=progress_bar)
     ###
     ###
 
     # ------------ Plotting ------------ #
 
     if progress_bar is not None:
-        progress_bar.progress(0.95, "Generating figures")
+        progress_bar.progress(0.99, "Generating figures")
 
     sns.set_theme(style="darkgrid")
     # Preconfigured values: {paper, notebook, talk, poster}
