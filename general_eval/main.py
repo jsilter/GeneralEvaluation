@@ -397,15 +397,14 @@ def glossary_of_terms():
 
     return fig
 
-def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85, ppv_target=0.20, output_path=None, n_bootstraps=0):
+def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85, ppv_target=0.20,
+                  output_path=None, n_bootstraps=0, progress_bar=None):
     # Column names
     diagnosis_days_col = DIAGNOSIS_DAYS_COL
     followup_days_col = FOLLOWUP_DAYS_COL
     # num_years = None
     outcome_cols = [diagnosis_days_col, followup_days_col]
     required_columns = outcome_cols
-
-    # n_bootstraps = 10
 
     # Set a minimum number of months between exam and diagnosis?
     min_months = 0
@@ -468,12 +467,18 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
 
     ### Calculate ROC curves and binary metrics, separated by category (ie year)
     ###
-    curves_by_cat, stats_by_cat, all_metrics_df = gel.metrics_by_category(input_df, categories, split_col=split_col,
-                                                                          n_bootstraps=n_bootstraps)
+    curves_by_cat, stats_by_cat, all_metrics_df = gel.metrics_by_category(input_df, categories,
+                                                                          split_col=split_col,
+                                                                          n_bootstraps=n_bootstraps,
+                                                                          progress_bar=progress_bar)
     ###
     ###
 
     # ------------ Plotting ------------ #
+
+    if progress_bar is not None:
+        progress_bar.progress(0.95, "Generating figures")
+
     sns.set_theme(style="darkgrid")
     # Preconfigured values: {paper, notebook, talk, poster}
     sns.set_context("notebook", font_scale=1.0)

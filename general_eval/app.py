@@ -97,28 +97,34 @@ Remove PHI before uploading. If there are missing columns, you will see an error
                                  help="The target PPV/precision value for the model. ",
                                  step=1.0)
 
-    n_bootstraps = st.number_input("Number of Bootstraps", value=0,
-                                   help="Number of bootstrap iterations to use for confidence intervals. "
-                                        "Note that this will increase the runtime of the evaluation.")
+    use_bootstrap = st.checkbox("Use Bootstrap", value=False,
+                                help="Use bootstrap resampling to estimate confidence intervals. This will increase the runtime of the evaluation.")
+    n_bootstraps = st.number_input("Number of Bootstraps", value=1000, min_value=10, disabled=not use_bootstrap,
+                                   help="Number of bootstrap iterations to use for confidence intervals. ")
 
     run_button = st.button("Run Evaluation", disabled=uploaded_file is None)
 
     if run_button and uploaded_file is not None:
         proc_str = "File uploaded, processing..."
-        with st.spinner(proc_str):
+        my_bar = st.progress(0, proc_str)
+        with st.spinner():
             # Save the uploaded file to a temporary location
             with tempfile.NamedTemporaryFile(suffix=uploaded_file.name, delete=True) as temp_file:
                 temp_file.write(uploaded_file.getvalue())
                 temp_file_path = temp_file.name
+                n_bootstraps = n_bootstraps if use_bootstrap else 0
                 pdf_output_file, all_metrics_df = run_full_eval(ds_name, temp_file_path,
                                                                 sensitivity_target=sensitivity_target / 100.,
                                                                 ppv_target=ppv_target / 100.,
-                                                                n_bootstraps=n_bootstraps)
+                                                                n_bootstraps=n_bootstraps,
+                                                                progress_bar=my_bar)
 
             st.success("Evaluation complete!")
             st.session_state.analysis_done = True
             st.session_state.pdf_output_file = pdf_output_file
             st.session_state.all_metrics_df = all_metrics_df
+
+        my_bar.empty()
 
 
     if st.session_state.analysis_done:

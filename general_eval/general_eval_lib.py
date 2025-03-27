@@ -331,13 +331,14 @@ def plot_histograms(input_df, true_col, pred_col, title_prefix=""):
     true_value_counts_ = plot_df[true_col].value_counts()
     nneg = true_value_counts_[0]
     npos = true_value_counts_[1]
-    plot_df[true_col] = plot_df[true_col].map(
-        {0: f"Negative ({nneg})", 1: f"Positive ({npos})"})
+    cat_map = {0: f"Negative ({nneg})", 1: f"Positive ({npos})"}
+    plot_df[true_col] = plot_df[true_col].map(cat_map)
+    cat_order = [cat_map[0], cat_map[1]]
 
     fig, (ax0, ax1) = plt.subplots(nrows=1, ncols=2, figsize=(14, 6), 
                                   gridspec_kw={'wspace': 0.3})
     
-    ax = sns.kdeplot(plot_df, ax=ax0, x=pred_col, hue=true_col, 
+    ax = sns.kdeplot(plot_df, ax=ax0, x=pred_col, hue=true_col, hue_order=cat_order,
                 linewidth=0.5, bw_adjust=1.0,
                 fill=True, common_norm=False, cumulative=False)
     _ = ax.set_xlim([0.0, 1.0])
@@ -347,7 +348,8 @@ def plot_histograms(input_df, true_col, pred_col, title_prefix=""):
     _ = ax.set_xlabel("Predicted Probability")
     
     ax = ax1
-    _ = sns.boxplot(plot_df, ax=ax1, y=pred_col, x=true_col, hue=true_col)
+    _ = sns.boxplot(plot_df, ax=ax1, y=pred_col, x=true_col, hue=true_col,
+                    order=cat_order, hue_order=cat_order)
     # _ = sns.move_legend(ax, loc="upper right")
     _ = ax.set_xlabel("Outcome")
     _ = ax.set_ylabel("Predicted Probability")
