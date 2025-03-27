@@ -40,6 +40,16 @@ The following steps should be completed on a terminal.
     ```sh
     pip install .
     ```
+###  Install and run with pipx
+
+You can also install the package using [pipx](https://pipx.pypa.io/stable/) to run the command-line tool without activating the virtual environment.
+```shell
+git clone https://github.com/reginabarzilaygroup/GeneralEvaluation
+cd GeneralEvaluation
+pipx install .
+general-eval
+```
+
 
 ## Run
 
@@ -56,7 +66,7 @@ The following steps should be completed on a terminal.
 
 1. Prepare your results from Mirai or Sybil. See the [Input Data Format](#input-data-format) section for details.
 2. Upload a results table in CSV, TSV, XLS, or XLSX format.
-3. The default sensitivity target is `0.85`. If desired, you may adjust the sensitivity target. 
+3. Adjust sensitivity and PPV targets as desired. (optional)
 4. Click the "Run Evaluation" button.
 5. Download the PDF report and the CSV file with overall metrics.
 
@@ -83,7 +93,7 @@ An example data file is provided in the `data` folder. You can download it from 
 
 ## Methods
 
-The performance is evaluated using multiple metrics. Area-under-the-curve (AUC) and precision-recall curve (PRC) are calculated with [scikit-learn](https://scikit-learn.org/stable/) functions. The "Net Benefit" is calculated according to the definition in [Piovani et al](https://pmc.ncbi.nlm.nih.gov/articles/PMC10454914/).
+The performance is evaluated using multiple metrics. Area-under-the-curve (AUC) and precision-recall curve (PRC) are calculated with [scikit-learn](https://scikit-learn.org/stable/) functions. 
 
 ## License
 

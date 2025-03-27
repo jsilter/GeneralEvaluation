@@ -38,7 +38,7 @@ def _get_parser():
     parser.add_argument("--output_path", default=None,
                         type=str, help="Path to save the output report file.")
 
-    parser.add_argument("--split_col", default="Year",
+    parser.add_argument("--category_name", default="Year",
                         type=str, help="Column to use for subdividing data into subsets. "
                                        "Analysis will be repeated across each unique value of this column.")
 
@@ -241,7 +241,7 @@ def create_perf_stats_table(stats_by_cat):
 
     return fig, perf_df
 
-def generate_standards_df(all_metrics_df, standards, categories, split_col):
+def generate_standards_df(all_metrics_df, standards, categories, category_name):
     # Print out table of thresholds and stats
 
     summary_metrics_by_cat_standard = []
@@ -249,7 +249,7 @@ def generate_standards_df(all_metrics_df, standards, categories, split_col):
     for standard in standards:
         for cat in categories:
             split_name = cat["name"]
-            split_df = all_metrics_df.query(f"{split_col} == '{split_name}'").copy()
+            split_df = all_metrics_df.query(f"{category_name} == '{split_name}'").copy()
             if "bootstrap_index" in all_metrics_df.columns:
                 split_df = split_df.query("bootstrap_index == 0").copy()
 
@@ -265,7 +265,7 @@ def generate_standards_df(all_metrics_df, standards, categories, split_col):
                 num_bootstraps = len(all_metrics_df["bootstrap_index"].unique())
 
                 if num_bootstraps >= 2:
-                    bootstrapped_df = all_metrics_df.query(f"{split_col} == '{split_name}'") \
+                    bootstrapped_df = all_metrics_df.query(f"{category_name} == '{split_name}'") \
                                                     .query("threshold == @best_row['threshold']")
 
                     for metric in all_standard_metrics:
@@ -280,7 +280,7 @@ def generate_standards_df(all_metrics_df, standards, categories, split_col):
     summary_metrics_by_cat_standard = pd.DataFrame(summary_metrics_by_cat_standard).reset_index(drop=True)
     return summary_metrics_by_cat_standard
 
-def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split_col):
+def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, category_name):
 
     standard_names = summary_metrics_by_cat_standard["standard"].unique()
     for standard_name in standard_names:
@@ -297,7 +297,7 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split
 
         # Re-arrange column order
         custom_column_order = [
-            "standard", split_col, "threshold", "sensitivity", "sensitivity_ci", "PPV", "PPV_ci", "specificity",
+            "standard", category_name, "threshold", "sensitivity", "sensitivity_ci", "PPV", "PPV_ci", "specificity",
             "LR+", "pred_pos_rate", "N",
         ]
         custom_column_order = [cc for cc in custom_column_order if cc in df.columns]
@@ -468,7 +468,8 @@ def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=
     ### Calculate ROC curves and binary metrics, separated by category (ie year)
     ###
     curves_by_cat, stats_by_cat, all_metrics_df = gel.metrics_by_category(input_df, categories,
-                                                                          category_name=category_name, n_bootstraps=n_bootstraps,
+                                                                          category_name=category_name,
+                                                                          n_bootstraps=n_bootstraps,
                                                                           progress_bar=progress_bar)
     ###
     ###
@@ -530,7 +531,7 @@ def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=
 
         # Waffle chart showing distribution of positive/negative cases
         for standard in standards:
-            fig = gel.plot_waffle(summary_metrics_by_cat_standard, split_col=category_name, split_val=split_name,
+            fig = gel.plot_waffle(summary_metrics_by_cat_standard, category_name=category_name, category_val=split_name,
                                   standard_name=standard["name"])
             _save_and_close_fig(pdf_pages, fig)
 
@@ -553,5 +554,5 @@ def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=
 
 if True and __name__ == "__main__":
     args= _get_parser().parse_args()
-    run_full_eval(args.ds_name, args.input_path, category_name=args.split_col, sensitivity_target=args.recall_target,
+    run_full_eval(args.ds_name, args.input_path, category_name=args.category_name, sensitivity_target=args.recall_target,
                   output_path=args.output_path)

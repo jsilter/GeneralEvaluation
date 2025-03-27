@@ -89,7 +89,8 @@ def metrics_by_category(input_df, categories, category_name, n_bootstraps=0, pro
             bi_cur_stats, bi_cur_curves = calculate_auc_stats_curves(y_true, y_pred, calculate_curves=False)
             bootstrapped_aucs.append(bi_cur_stats["auc"])
 
-        cur_stats["auc_ci"] = np.percentile(bootstrapped_aucs, [5, 95]).round(4)
+        if n_bootstraps > 0:
+            cur_stats["auc_ci"] = np.percentile(bootstrapped_aucs, [5, 95]).round(4)
 
         curves_by_cat[name] = cur_curves
         stats_by_cat[name] = cur_stats
@@ -367,11 +368,11 @@ def print_threshold_metrics(all_metrics_df, split_col, split_name, check_key="re
     # display("------")
 
 def plot_waffle(summary_metrics_by_cat_standard, standard_name="Sensitivity",
-                split_col="Year", split_val="Year 1"):
+                category_name="Year", category_val="Year 1"):
     from pywaffle import Waffle
 
     df = summary_metrics_by_cat_standard.query(f"standard == '{standard_name}'")
-    data_dict = df[df[split_col] == split_val].to_dict(orient="records")[0]
+    data_dict = df[df[category_name] == category_val].to_dict(orient="records")[0]
 
     # icons = ["user-check", "user-slash", "user-slash", "user-check"]
     # https://matplotlib.org/stable/gallery/color/named_colors.html
@@ -399,7 +400,7 @@ def plot_waffle(summary_metrics_by_cat_standard, standard_name="Sensitivity",
             "fontsize": 12,
         },
     )
-    plt.title(f"{split_val}, {standard_name} Target Result")
+    plt.title(f"{category_val}, {standard_name} Target Result")
     plt.tight_layout()
 
     return fig
@@ -427,5 +428,6 @@ def plot_calibration_curve(input_df, true_col, pred_col, fig_name):
     _ = ax.set_xlabel("Mean predicted probability")
     _ = ax.set_ylabel("Fraction of positives")
     _ = ax.set_title(f"{fig_name} Calibration Curve")
+    plt.tight_layout()
 
     return fig
