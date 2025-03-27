@@ -47,7 +47,7 @@ def get_split_names(input_df, split_col, true_col, do_print=True):
 
     return all_split_names
 
-def metrics_by_category(input_df, categories, split_col, n_bootstraps=0, progress_bar=None):
+def metrics_by_category(input_df, categories, category_name, n_bootstraps=0, progress_bar=None):
     """Calculate ROC curves and binary metrics, separated by category (ie year)"""
     curves_by_cat = {}
     stats_by_cat = {}
@@ -64,9 +64,13 @@ def metrics_by_category(input_df, categories, split_col, n_bootstraps=0, progres
 
         bootstrapped_aucs = []
         np.random.seed(42)
-        for bi in range(n_bootstraps + 1):
+        bi_iters = max(n_bootstraps, 1)
+        for bi in range(bi_iters):
             if progress_bar:
-                progress_bar.progress((ii*n_bootstraps + bi) / total_bis, f"Processing {name} Bootstrap {bi}")
+                progbar_text = f"Processing {name}"
+                progbar_text += f" Bootstrap {bi+1}" if bi >= 1 else ""
+                progress_bar.progress((ii*bi_iters + bi) / total_bis, progbar_text)
+
             # Note that we use the same thresholds for each bootstrap.
             # We're simulating generalization error, not model uncertainty.
             prc_thresholds = cur_curves["prc_thresholds"]
@@ -78,7 +82,7 @@ def metrics_by_category(input_df, categories, split_col, n_bootstraps=0, progres
 
             metrics_df = binary_metrics_by_threshold(y_true, y_pred, prc_thresholds)
             metrics_df["bootstrap_index"] = bi
-            metrics_df[split_col] = name
+            metrics_df[category_name] = name
 
             metrics_list.append(metrics_df)
 
@@ -235,32 +239,6 @@ def binary_metrics_by_threshold(y_true, y_pred, thresholds):
         metrics_df["_net_benefit_treat_all"] = _tmp1 - (_act_neg_rate*_tmp3)
 
     return metrics_df
-
-def calc_all_metrics(curves_by_split, split_col="split", all_split_names=None, n_bootstraps=0):
-    if all_split_names is None:
-        all_split_names = list(curves_by_split.keys())
-
-    metrics_list = []
-    np.random.seed(42)
-    for bi in range(n_bootstraps + 1):
-        for split_name in all_split_names:
-            cur_curves = curves_by_split[split_name]
-            # Note that we use the same thresholds for each bootstrap.
-            # We're simulating generalization error, not model uncertainty.
-            prc_thresholds = cur_curves["prc_thresholds"]
-            y_true, y_pred = cur_curves["y_true"], cur_curves["y_pred"]
-            if bi >= 1:
-                N = len(y_true)
-                cur_bi_inds = np.random.choice(np.arange(N), N, replace=True)
-                y_true, y_pred = y_true[cur_bi_inds], y_pred[cur_bi_inds]
-
-            metrics_df = binary_metrics_by_threshold(y_true, y_pred, prc_thresholds)
-            metrics_df[split_col] = split_name
-            metrics_df["bootstrap_index"] = bi
-            metrics_list.append(metrics_df)
-    
-    all_metrics_df = pd.concat(metrics_list)
-    return all_metrics_df
 
 def plot_binary_metrics(metrics_df, title_prefix=""):
     x_column = "threshold"

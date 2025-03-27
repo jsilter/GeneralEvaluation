@@ -99,7 +99,7 @@ Remove PHI before uploading. If there are missing columns, you will see an error
 
     use_bootstrap = st.checkbox("Use Bootstrap", value=False,
                                 help="Use bootstrap resampling to estimate confidence intervals. This will increase the runtime of the evaluation.")
-    n_bootstraps = st.number_input("Number of Bootstraps", value=1000, min_value=10, disabled=not use_bootstrap,
+    n_bootstraps = st.number_input("Number of Bootstraps", value=5000, min_value=10, disabled=not use_bootstrap,
                                    help="Number of bootstrap iterations to use for confidence intervals. ")
 
     run_button = st.button("Run Evaluation", disabled=uploaded_file is None)

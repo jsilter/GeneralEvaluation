@@ -397,7 +397,7 @@ def glossary_of_terms():
 
     return fig
 
-def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85, ppv_target=0.20,
+def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=0.85, ppv_target=0.20,
                   output_path=None, n_bootstraps=0, progress_bar=None):
     # Column names
     diagnosis_days_col = DIAGNOSIS_DAYS_COL
@@ -468,13 +468,12 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
     ### Calculate ROC curves and binary metrics, separated by category (ie year)
     ###
     curves_by_cat, stats_by_cat, all_metrics_df = gel.metrics_by_category(input_df, categories,
-                                                    split_col=split_col, n_bootstraps=n_bootstraps,
-                                                    progress_bar=progress_bar)
+                                                                          category_name=category_name, n_bootstraps=n_bootstraps,
+                                                                          progress_bar=progress_bar)
     ###
     ###
 
     # ------------ Plotting ------------ #
-
     if progress_bar is not None:
         progress_bar.progress(0.99, "Generating figures")
 
@@ -500,8 +499,8 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
     _save_and_close_fig(pdf_pages, fig)
 
     ### TABLEs of thresholds for particular targets
-    summary_metrics_by_cat_standard = generate_standards_df(all_metrics_df, standards, categories, split_col)
-    plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, split_col)
+    summary_metrics_by_cat_standard = generate_standards_df(all_metrics_df, standards, categories, category_name)
+    plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, category_name)
 
     fig = glossary_of_terms()
     _save_and_close_fig(pdf_pages, fig)
@@ -518,8 +517,8 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
         split_df = input_df.query(f"{true_col} >= 0")
 
         metrics_df = all_metrics_df
-        if split_col is not None:
-            metrics_df = all_metrics_df[all_metrics_df[split_col] == split_name]
+        if category_name is not None:
+            metrics_df = all_metrics_df[all_metrics_df[category_name] == split_name]
         if "bootstrap_index" in all_metrics_df.columns:
             metrics_df = metrics_df.query("bootstrap_index == 0")
 
@@ -531,7 +530,7 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
 
         # Waffle chart showing distribution of positive/negative cases
         for standard in standards:
-            fig = gel.plot_waffle(summary_metrics_by_cat_standard, split_col=split_col, split_val=split_name,
+            fig = gel.plot_waffle(summary_metrics_by_cat_standard, split_col=category_name, split_val=split_name,
                                   standard_name=standard["name"])
             _save_and_close_fig(pdf_pages, fig)
 
@@ -554,5 +553,5 @@ def run_full_eval(ds_name, input_path, split_col="Year", sensitivity_target=0.85
 
 if True and __name__ == "__main__":
     args= _get_parser().parse_args()
-    run_full_eval(args.ds_name, args.input_path, split_col=args.split_col, sensitivity_target=args.recall_target,
+    run_full_eval(args.ds_name, args.input_path, category_name=args.split_col, sensitivity_target=args.recall_target,
                   output_path=args.output_path)
