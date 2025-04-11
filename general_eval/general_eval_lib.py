@@ -27,9 +27,6 @@ def load_input_df(name, content, **kwargs):
 
     return input_df
 
-def transform_cancyr_binary(invals, max_year=5):
-    return np.logical_and(invals >= 1, invals <= max_year).astype(int)
-
 def get_split_names(input_df, split_col, true_col, do_print=True):
     all_split_names = input_df[split_col].unique()
     all_split_names = list(sorted(all_split_names))[::-1]
@@ -74,7 +71,7 @@ def metrics_by_category(input_df, categories, category_name, n_bootstraps=0, pro
             # Note that we use the same thresholds for each bootstrap.
             # We're simulating generalization error, not model uncertainty.
             prc_thresholds = cur_curves["prc_thresholds"]
-            y_true, y_pred = cur_curves["y_true"], cur_curves["y_pred"]
+            y_true, y_pred = cur_df[true_col].values, cur_df[pred_col].values
             if bi >= 1:
                 N = len(y_true)
                 cur_bi_inds = np.random.choice(np.arange(N), N, replace=True)
@@ -99,10 +96,17 @@ def metrics_by_category(input_df, categories, category_name, n_bootstraps=0, pro
     return curves_by_cat, stats_by_cat, all_metrics_df
 
 def calculate_auc_stats_curves(y_true, y_pred, calculate_curves=True):
-    stat_dict = {}
-    stat_dict["auc"] = float(roc_auc_score(y_true, y_pred))
-    stat_dict["pr_auc"] = float(average_precision_score(y_true, y_pred))
-    # stat_dict["auc_ci"] = np.percentile(bootstrapped_aucs, [5, 95]).round(4)
+    stat_dict = {"auc": None, "pr_auc": None}
+    try:
+        stat_dict["auc"] = float(roc_auc_score(y_true, y_pred))
+    except ValueError:
+        # This can happen if all y_true are the same
+        stat_dict["auc"] = np.nan
+
+    try:
+        stat_dict["pr_auc"] = float(average_precision_score(y_true, y_pred))
+    except ValueError:
+        stat_dict["pr_auc"] = np.nan
 
     curve_dict = {}
     if calculate_curves:
@@ -190,7 +194,7 @@ def confusion_matrix_3d(y_true, y_pred, thresholds):
 
 def binary_metrics_by_threshold(y_true, y_pred, thresholds):
     full_conf_matr = confusion_matrix_3d(y_true, y_pred, thresholds)
-    N = np.sum(full_conf_matr[:, :, 0])
+    N = len(y_true)
     simple_data = {"threshold": thresholds,
                    "TN": full_conf_matr[0, 0, :],
                    "FN": full_conf_matr[1, 0, :],

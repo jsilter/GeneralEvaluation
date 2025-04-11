@@ -102,7 +102,12 @@ Remove PHI before uploading. If there are missing columns, you will see an error
     n_bootstraps = st.number_input("Number of Bootstraps", value=5000, min_value=10, disabled=not use_bootstrap,
                                    help="Number of bootstrap iterations to use for confidence intervals. ")
 
+    subgroup = st.text_input("Optional Subgroup Column Name. Must match *exactly* (including case). ", value="",
+                             help="Optional column name to use for subgroup analysis. If provided, the model will be evaluated separately for each subgroup, meaning each unique value found in this column. ")
+
     run_button = st.button("Run Evaluation", disabled=uploaded_file is None)
+
+    st.markdown("---")
 
     if run_button and uploaded_file is not None:
         proc_str = "File uploaded, processing..."
@@ -113,16 +118,20 @@ Remove PHI before uploading. If there are missing columns, you will see an error
                 temp_file.write(uploaded_file.getvalue())
                 temp_file_path = temp_file.name
                 n_bootstraps = n_bootstraps if use_bootstrap else 0
-                pdf_output_file, all_metrics_df = run_full_eval(ds_name, temp_file_path,
+                pdf_output_file, all_metrics_df, run_warnings = run_full_eval(ds_name, temp_file_path,
                                                                 sensitivity_target=sensitivity_target / 100.,
                                                                 ppv_target=ppv_target / 100.,
+                                                                subgroups=[subgroup] if subgroup else (),
                                                                 n_bootstraps=n_bootstraps,
-                                                                progress_bar=my_bar)
+                                                                progress_bar=my_bar,
+                                                                )
 
             st.success("Evaluation complete!")
             st.session_state.analysis_done = True
             st.session_state.pdf_output_file = pdf_output_file
             st.session_state.all_metrics_df = all_metrics_df
+            for run_warning in run_warnings:
+                st.warning(run_warning)
 
         my_bar.empty()
 

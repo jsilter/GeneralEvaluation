@@ -8,6 +8,7 @@ We expect a datasheet of patient and exam information.
 import argparse
 import datetime
 import os
+import traceback
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,7 @@ import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
 
 import general_eval.general_eval_lib as gel
+import general_eval.metrics as gel_metrics
 from general_eval.general_eval_lib import plot_roc_prc
 
 DAYS_PER_YEAR = 365
@@ -198,7 +200,7 @@ def create_basic_stats_table(input_df, diagnosis_days_col):
 
     return fig, basic_stats_df
 
-def create_perf_stats_table(stats_by_cat):
+def create_perf_stats_table(stats_by_cat, subgroup_name=None, subgroup_value=None, bottom_text=None):
     perf_df = pd.DataFrame(stats_by_cat).T
     has_ci = "auc_ci" in perf_df.columns
     keep_cols = ["auc", "pr_auc", "N"]
@@ -218,6 +220,12 @@ def create_perf_stats_table(stats_by_cat):
         column_labels.insert(2, "AUC CI (5%-95%)")
     perf_df.columns = column_labels
 
+    title_suffix = None
+    if subgroup_name:
+        assert subgroup_value is not None
+        title_suffix = f"{subgroup_name}: {subgroup_value}"
+        perf_df.insert(1, subgroup_name, subgroup_value)
+
     # Create a figure and axis
     fig, ax = plt.subplots(figsize=(8, 3))  # Adjust the size as needed
     # Create the table
@@ -234,10 +242,22 @@ def create_perf_stats_table(stats_by_cat):
         cell.set_height(col_height)
 
     ax.add_table(table)
-    plt.title("Overall Performance by Year", pad=16, fontweight='bold')
+    label = "Overall Performance"
+    if title_suffix:
+        label += f" ({title_suffix})"
+    plt.title(label, pad=16, fontweight='bold')
     plt.subplots_adjust(top=0.80)
     ax.axis('tight')
     ax.axis('off')
+
+    if bottom_text:
+        table_bbox = table.get_window_extent(fig.canvas.get_renderer())
+        inv = ax.transAxes.inverted()
+        table_bbox_axes = inv.transform_bbox(table_bbox)
+        myx = table_bbox_axes.x0
+        # print(f"my x: {myx}")
+        ax.text(myx, +0.1, bottom_text, ha='left', va='top', transform=ax.transAxes, fontsize=12)
+
 
     return fig, perf_df
 
@@ -365,39 +385,53 @@ def plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, categ
 
 def glossary_of_terms():
     # Print definitions of terms used in the report
-    fig, ax = plt.subplots()
-    ax.axis('off')
 
-    ax.text(0.01, 0.95, "Glossary of Terms", fontsize=16, fontweight='bold')
-    other_text = """
-    Sensitivity: The proportion of true positive cases that are correctly 
-    identified by the model. Also known as "Recall".
-    
-    Specificity: The proportion of true negative cases that are correctly 
-    identified by the model. Also known as "True Negative Rate".
-    
-    PPV: Positive Predicted Value. 
-    The proportion of positive cases identified by the model 
-    that are actually positive. Also known as "Precision".
-    
-    AUROC: Area Under the Receiver Operating Characteristic curve.
-    A random classifier has an AUROC of 0.5, 
-    while a perfect classifier has an AUROC of 1.0.
-    
-    AUPRC: Area Under the Precision-Recall curve.
-    A random classifier has an AUPRC equal to the fraction of 
-    positive cases in the dataset, 
-    while a perfect classifier has an AUPRC of 1.0.
-    
-    LR+: The positive likelihood ratio, which is the ratio of the
-    true positive rate to the false positive rate.
-    """
-    ax.text(0.01, 0.9, other_text, fontsize=12, ha="left", va="top")
-    plt.tight_layout()
+    text1 = """
+Sensitivity: The proportion of true positive cases that are correctly 
+identified by the model. Also known as "Recall".
 
-    return fig
+Specificity: The proportion of true negative cases that are correctly 
+identified by the model. Also known as "True Negative Rate".
 
-def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=0.85, ppv_target=0.20,
+PPV: Positive Predicted Value. 
+The proportion of positive cases identified by the model 
+that are actually positive. Also known as "Precision".
+"""
+
+    text2 = """
+AUROC: Area Under the Receiver Operating Characteristic curve.
+A random classifier has an AUROC of 0.5, 
+while a perfect classifier has an AUROC of 1.0.
+
+AUPRC: Area Under the Precision-Recall curve.
+A random classifier has an AUPRC equal to the fraction of 
+positive cases in the dataset, 
+while a perfect classifier has an AUPRC of 1.0.
+
+Uno's C-index: Concordance (C) index. A measure of the model's ability to 
+correctly rank the predicted risk of patients, with a value of 1.0 indicating
+perfect concordance and 0.5 indicating no concordance.
+
+LR+/Relative Risk: The positive likelihood ratio, which is the ratio of the
+true positive rate to the false positive rate.
+"""
+
+    all_texts = [text1, text2]
+    all_figs = []
+
+    for text in all_texts:
+        text = text.strip()
+        fig, ax = plt.subplots()
+        ax.axis('off')
+
+        ax.text(0.01, 0.95, "Glossary of Terms", fontsize=16, fontweight='bold')
+        ax.text(0.01, 0.9, text, fontsize=14, ha="left", va="top")
+        plt.tight_layout()
+        all_figs.append(fig)
+
+    return all_figs
+
+def run_full_eval(ds_name, input_path, category_name="Year", subgroups=(), sensitivity_target=0.85, ppv_target=0.20,
                   output_path=None, n_bootstraps=0, progress_bar=None):
     # Column names
     diagnosis_days_col = DIAGNOSIS_DAYS_COL
@@ -417,6 +451,9 @@ def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=
         {"name": "Year 5", "pred_col": "Year5", "true_col": "true_year5"},
         {"name": "Year 6", "pred_col": "Year6", "true_col": "true_year6"},
     ]
+    min_n_per_class = 10
+
+    warnings = []
 
     standards = [
         {"name": f"Sensitivity", "metric": "sensitivity", "direction": "min_diff", "target_value": sensitivity_target},
@@ -430,16 +467,40 @@ def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=
 
     input_name = os.path.basename(input_path)
     input_df = gel.load_input_df(input_name, input_path, comment="#")
-    input_df = input_df.dropna(subset=[followup_days_col])
+
     # Remove spaces from column names
     input_df.columns = input_df.columns.str.replace(" ", "")
 
-    keep_categories = [cat for cat in categories if cat["pred_col"] in input_df.columns]
-    if len(keep_categories) == 0:
-        category_names = [cat["pred_col"] for cat in categories]
-        raise ValueError(f"Input file does not contain any of the expected categories: {category_names}")
+    keep_categories = []
+    for ic, cat in enumerate(categories):
+        if cat["pred_col"] in input_df.columns:
+            keep_categories.append(cat)
+        elif ic <= 5:
+            warnings.append(f"Input file does not contain expected prediction column: {cat['pred_col']}")
+
     num_years = len(keep_categories)
     categories = keep_categories
+    category_names = [cat["pred_col"] for cat in categories]
+    if len(keep_categories) == 0:
+        raise ValueError(f"Input file does not contain any of the expected categories: {category_names}")
+
+    keep_subgroups = []
+    for sg in subgroups:
+        if sg not in input_df.columns:
+            warnings.append(f"Input file does not contain subgroup column: {sg}")
+        else:
+            keep_subgroups.append(sg)
+    subgroups = keep_subgroups
+    if warnings:
+        warnings.append(f"Columns found in uploaded file: {', '.join(input_df.columns)}")
+
+
+    # If the followup days value is not present, for a positive diagnosis, set it to the diagnosis days value
+    input_df[followup_days_col] = input_df.apply(
+        lambda row: row[diagnosis_days_col] if _is_positive_diag(row[diagnosis_days_col]) and
+                     pd.isna(row[followup_days_col]) else row[followup_days_col], axis=1)
+
+    input_df = input_df.dropna(subset=[followup_days_col])
 
     numeric_cols = outcome_cols + [cat["pred_col"] for cat in categories]
     input_df[outcome_cols] = input_df[outcome_cols].apply(_coerce_series_to_int)
@@ -465,12 +526,42 @@ def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=
         keep_rows = input_df.apply(_keep_row, axis=1)
         input_df = input_df.loc[keep_rows, :]
 
+
+    c_index = gel_metrics.get_concordance_index_from_df(input_df, diagnosis_days_col, followup_days_col,
+                                                        score_columns=category_names)
+
     ### Calculate ROC curves and binary metrics, separated by category (ie year)
     ###
     curves_by_cat, stats_by_cat, all_metrics_df = gel.metrics_by_category(input_df, categories,
                                                                           category_name=category_name,
                                                                           n_bootstraps=n_bootstraps,
                                                                           progress_bar=progress_bar)
+
+    # Calculate ROC curves and binary metrics for each category (ie year) and subgroup
+    subgroup_stats_by_cat = {}
+    subgroup_c_indexes = {}
+    for subgroup_name in subgroups:
+        subgroup_values = input_df[subgroup_name].unique()
+        for subgroup_value in subgroup_values:
+            if progress_bar is not None:
+                progress_bar.progress(0.98, f"Calculating metrics for {subgroup_name}: {subgroup_value}")
+
+            subgroup_df = input_df[input_df[subgroup_name] == subgroup_value]
+            cur_num_samples = subgroup_df.shape[0]
+            if cur_num_samples == 0:
+                continue
+
+            _, cur_stats_by_cat, _ = gel.metrics_by_category(subgroup_df, categories,
+                                                         category_name=category_name,
+                                                         n_bootstraps=n_bootstraps)
+            subgroup_stats_by_cat[(subgroup_name, subgroup_value)] = cur_stats_by_cat
+
+            subgroup_c_indexes[(subgroup_name, subgroup_value)] = gel_metrics.get_concordance_index_from_df(subgroup_df,
+                                                                  diagnosis_days_col, followup_days_col,
+                                                                  score_columns=category_names)
+
+
+        del cur_stats_by_cat
     ###
     ###
 
@@ -488,12 +579,21 @@ def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=
         plt.close(_fig)
 
     ### FIGURE Plot ROC Curves
-    fig, ax = plot_roc_prc(curves_by_cat, stats_by_cat, f"{ds_name} Validation")
+    fig, ax = plot_roc_prc(curves_by_cat, stats_by_cat, ds_name)
     _save_and_close_fig(pdf_pages, fig)
 
     ### TABLE Performance statistics (AUC, ROC) by category
-    fig, overall_perf_df = create_perf_stats_table(stats_by_cat)
+    bottom_text = f"Uno's C-index: {c_index:.1%}"
+    fig, overall_perf_df = create_perf_stats_table(stats_by_cat, bottom_text=bottom_text)
     _save_and_close_fig(pdf_pages, fig)
+
+    for subgroup_key, cur_stats_by_cat in subgroup_stats_by_cat.items():
+        ### TABLE Performance statistics (AUC, ROC) by subgroup
+        subgroup_name, subgroup_value = subgroup_key
+        subgroup_c_index = subgroup_c_indexes[subgroup_key]
+        bottom_text = f"Uno's C-index: {subgroup_c_index:.1%}"
+        fig, overall_perf_df = create_perf_stats_table(cur_stats_by_cat, subgroup_name, subgroup_value, bottom_text=bottom_text)
+        _save_and_close_fig(pdf_pages, fig)
 
     ### TABLE Basic stats table (counts of patients within specific time windows)
     fig, basic_stats_df = create_basic_stats_table(input_df, diagnosis_days_col)
@@ -503,8 +603,9 @@ def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=
     summary_metrics_by_cat_standard = generate_standards_df(all_metrics_df, standards, categories, category_name)
     plot_summary_tables_on_pdf(pdf_pages, summary_metrics_by_cat_standard, category_name)
 
-    fig = glossary_of_terms()
-    _save_and_close_fig(pdf_pages, fig)
+    figs = glossary_of_terms()
+    for fig in figs:
+        _save_and_close_fig(pdf_pages, fig)
 
     ### FIGURE
 
@@ -523,6 +624,18 @@ def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=
         if "bootstrap_index" in all_metrics_df.columns:
             metrics_df = metrics_df.query("bootstrap_index == 0")
 
+        class_counts = split_df[true_col].value_counts()
+        skip_cat = False
+        if len(class_counts) < 2:
+            warnings.append(f"Split {split_name} only has {len(class_counts)} classes. Skipping plots.")
+            skip_cat = True
+        for cc, val in class_counts.items():
+            if val <= min_n_per_class:
+                warnings.append(f"Split {split_name}, class {cc} only has N={val} samples. Skipping plots.")
+                skip_cat = True
+        if skip_cat:
+            continue
+
         ### FIGURE
         figures = gel.plot_binary_metrics(metrics_df, fig_name)
 
@@ -537,8 +650,13 @@ def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=
 
         ### FIGURE
         # Histogram and boxplot of predictions by actual class
-        fig = gel.plot_histograms(split_df, true_col, pred_col, fig_name)
-        _save_and_close_fig(pdf_pages, fig)
+        try:
+            fig = gel.plot_histograms(split_df, true_col, pred_col, fig_name)
+            _save_and_close_fig(pdf_pages, fig)
+        except Exception as exc:
+            warnings.append(f"Error plotting histogram {split_name}: {exc}")
+            print(traceback.format_exc())
+            continue
 
         ### FIGURE
         # Calibration plot
@@ -548,8 +666,7 @@ def run_full_eval(ds_name, input_path, category_name="Year", sensitivity_target=
 
     pdf_pages.close()
 
-    # print(f"Saved evaluation report to {output_path}")
-    return output_path, all_metrics_df
+    return output_path, all_metrics_df, warnings
 
 
 if True and __name__ == "__main__":
