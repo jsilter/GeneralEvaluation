@@ -1,4 +1,5 @@
 # streamlit cloud requires a requirements.txt file
+lifelines==0.30.0
 matplotlib
 numpy>=1.24.1
 pandas
