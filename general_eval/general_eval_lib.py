@@ -50,6 +50,7 @@ def metrics_by_category(input_df, categories, category_name, n_bootstraps=0, pro
     stats_by_cat = {}
     metrics_list = []
     num_cats = len(categories)
+    bi_iters = n_bootstraps + 1
     total_bis = (n_bootstraps + 1) * num_cats
     for ii, cat in enumerate(categories):
         name = cat["name"]
@@ -61,7 +62,6 @@ def metrics_by_category(input_df, categories, category_name, n_bootstraps=0, pro
 
         bootstrapped_aucs = []
         np.random.seed(42)
-        bi_iters = max(n_bootstraps, 1)
         for bi in range(bi_iters):
             if progress_bar:
                 progbar_text = f"Processing {name}"
