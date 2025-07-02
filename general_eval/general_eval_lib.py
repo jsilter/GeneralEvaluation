@@ -65,7 +65,7 @@ def metrics_by_category(input_df, categories, category_name, n_bootstraps=0, pro
         for bi in range(bi_iters):
             if progress_bar:
                 progbar_text = f"Processing {name}"
-                progbar_text += f" Bootstrap {bi+1}" if bi >= 1 else ""
+                progbar_text += f" Bootstrap {bi}" if bi >= 1 else ""
                 progress_bar.progress((ii*bi_iters + bi) / total_bis, progbar_text)
 
             # Note that we use the same thresholds for each bootstrap.
