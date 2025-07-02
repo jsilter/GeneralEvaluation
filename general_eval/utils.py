@@ -1,4 +1,5 @@
 import datetime
+import subprocess
 
 # If we need to support more date formats, best to use dateutil.parser
 # import dateutil
@@ -11,3 +12,9 @@ def parse_date(date_str):
         except ValueError:
             continue
     raise ValueError(f"Date format for '{date_str}' is not supported")
+
+def get_git_commit_hash():
+    try:
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
+    except Exception:
+        return "unknown"

@@ -6,7 +6,6 @@ We expect a datasheet of patient and exam information.
 """
 
 import argparse
-import datetime
 import os
 import traceback
 
@@ -18,6 +17,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 import general_eval.general_eval_lib as gel
 import general_eval.metrics as gel_metrics
+import general_eval.utils as utils
 from general_eval.general_eval_lib import plot_roc_prc
 
 DAYS_PER_YEAR = 365
@@ -431,6 +431,19 @@ true positive rate to the false positive rate.
 
     return all_figs
 
+
+def get_pdf_metadata(ds_name):
+    commit_hash = utils.get_git_commit_hash()
+    metadata = {
+        "Title": f"{ds_name} Evaluation Report",
+        "Author": "https://github.com/reginabarzilaygroup/GeneralEvaluation",
+        "Authors": "https://github.com/reginabarzilaygroup/GeneralEvaluation",
+        "Creator": "https://github.com/reginabarzilaygroup/GeneralEvaluation",
+        "Subject": f"Git commit: {commit_hash}"
+    }
+    return metadata
+
+
 def run_full_eval(ds_name, input_path, category_name="Year", subgroups=(), sensitivity_target=0.85, ppv_target=0.20,
                   output_path=None, n_bootstraps=0, progress_bar=None):
     # Column names
@@ -527,6 +540,7 @@ def run_full_eval(ds_name, input_path, category_name="Year", subgroups=(), sensi
         input_df = input_df.loc[keep_rows, :]
 
 
+    # TODO Bootstrapping for c_index too
     c_index = gel_metrics.get_concordance_index_from_df(input_df, diagnosis_days_col, followup_days_col,
                                                         score_columns=category_names)
 
@@ -572,7 +586,7 @@ def run_full_eval(ds_name, input_path, category_name="Year", subgroups=(), sensi
     sns.set_theme(style="darkgrid")
     # Preconfigured values: {paper, notebook, talk, poster}
     sns.set_context("notebook", font_scale=1.0)
-    pdf_pages = PdfPages(output_path)
+    pdf_pages = PdfPages(output_path, metadata=get_pdf_metadata(ds_name))
 
     def _save_and_close_fig(_pdf_pages, _fig):
         _pdf_pages.savefig(_fig)
